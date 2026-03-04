@@ -1,0 +1,186 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Font Face Declarations ─────────────────────────────────── */
+@font-face {
+  font-family: "Cabinet Grotesk";
+  src: url("/assets/fonts/CabinetGrotesk-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Satoshi";
+  src: url("/assets/fonts/Satoshi-Variable.woff2") format("woff2");
+  font-weight: 300 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/assets/fonts/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+/* ─── Design Tokens ──────────────────────────────────────────── */
+@layer base {
+  :root {
+    --radius: 0.5rem;
+
+    /* Forest green + slate professional palette (light) */
+    --background: 0.97 0.005 250;
+    --foreground: 0.18 0.02 250;
+
+    --card: 1 0 0;
+    --card-foreground: 0.18 0.02 250;
+
+    --popover: 1 0 0;
+    --popover-foreground: 0.18 0.02 250;
+
+    --primary: 0.42 0.13 155;
+    --primary-foreground: 0.98 0 0;
+
+    --secondary: 0.93 0.01 250;
+    --secondary-foreground: 0.3 0.02 250;
+
+    --muted: 0.94 0.005 250;
+    --muted-foreground: 0.52 0.015 250;
+
+    --accent: 0.9 0.04 155;
+    --accent-foreground: 0.28 0.08 155;
+
+    --destructive: 0.577 0.245 27.325;
+    --destructive-foreground: 0.98 0 0;
+
+    --success: 0.42 0.13 155;
+    --success-foreground: 0.98 0 0;
+    --warning: 0.72 0.18 65;
+    --warning-foreground: 0.2 0 0;
+
+    --border: 0.88 0.01 250;
+    --input: 0.88 0.01 250;
+    --ring: 0.42 0.13 155;
+
+    --chart-1: 0.42 0.13 155;
+    --chart-2: 0.62 0.14 200;
+    --chart-3: 0.52 0.18 30;
+    --chart-4: 0.72 0.18 65;
+    --chart-5: 0.55 0.16 280;
+
+    --sidebar: 0.18 0.025 250;
+    --sidebar-foreground: 0.9 0.01 250;
+    --sidebar-primary: 0.52 0.16 155;
+    --sidebar-primary-foreground: 0.98 0 0;
+    --sidebar-accent: 0.25 0.03 250;
+    --sidebar-accent-foreground: 0.9 0.01 250;
+    --sidebar-border: 0.25 0.025 250;
+    --sidebar-ring: 0.52 0.16 155;
+
+    --status-active: 0.52 0.14 155;
+    --status-inactive: 0.6 0 0;
+    --status-lead: 0.62 0.12 250;
+    --status-scheduled: 0.62 0.14 200;
+    --status-in-progress: 0.7 0.18 65;
+    --status-completed: 0.52 0.14 155;
+    --status-invoiced: 0.58 0.15 280;
+    --status-paid: 0.45 0.12 155;
+    --status-cancelled: 0.577 0.245 27.325;
+    --status-overdue: 0.62 0.22 30;
+    --status-draft: 0.62 0 0;
+    --status-sent: 0.62 0.14 200;
+    --status-viewed: 0.65 0.13 250;
+    --status-void: 0.55 0 0;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Satoshi", sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Cabinet Grotesk", sans-serif;
+    font-weight: 700;
+  }
+}
+
+/* ─── Status Badge Utilities ─────────────────────────────────── */
+@layer utilities {
+  .status-active {
+    background-color: oklch(0.9 0.06 155);
+    color: oklch(0.3 0.12 155);
+  }
+  .status-inactive {
+    background-color: oklch(0.92 0 0);
+    color: oklch(0.45 0 0);
+  }
+  .status-lead {
+    background-color: oklch(0.9 0.06 250);
+    color: oklch(0.3 0.1 250);
+  }
+  .status-scheduled {
+    background-color: oklch(0.88 0.07 200);
+    color: oklch(0.3 0.12 200);
+  }
+  .status-in_progress, .status-in-progress {
+    background-color: oklch(0.95 0.09 65);
+    color: oklch(0.4 0.15 65);
+  }
+  .status-completed {
+    background-color: oklch(0.9 0.06 155);
+    color: oklch(0.3 0.12 155);
+  }
+  .status-invoiced {
+    background-color: oklch(0.9 0.07 280);
+    color: oklch(0.35 0.12 280);
+  }
+  .status-paid {
+    background-color: oklch(0.88 0.08 155);
+    color: oklch(0.25 0.12 155);
+  }
+  .status-cancelled {
+    background-color: oklch(0.95 0.06 27);
+    color: oklch(0.4 0.18 27);
+  }
+  .status-overdue {
+    background-color: oklch(0.95 0.1 30);
+    color: oklch(0.38 0.2 30);
+  }
+  .status-draft {
+    background-color: oklch(0.92 0 0);
+    color: oklch(0.45 0 0);
+  }
+  .status-sent {
+    background-color: oklch(0.88 0.07 200);
+    color: oklch(0.3 0.12 200);
+  }
+  .status-viewed {
+    background-color: oklch(0.9 0.06 250);
+    color: oklch(0.3 0.1 250);
+  }
+  .status-void {
+    background-color: oklch(0.92 0 0);
+    color: oklch(0.4 0 0);
+  }
+}
+
+/* ─── Scrollbar Styling ──────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(0.82 0.01 250);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.7 0.02 250);
+}
