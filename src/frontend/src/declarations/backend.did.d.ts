@@ -88,6 +88,22 @@ export interface UserProfile {
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
+export interface Visit {
+  'id' : string,
+  'startTime' : [] | [Time],
+  'status' : string,
+  'endTime' : [] | [Time],
+  'scheduledDate' : Time,
+  'createdAt' : Time,
+  'laborHours' : number,
+  'jobId' : string,
+  'photoIds' : Array<string>,
+  'updatedAt' : Time,
+  'notes' : [] | [string],
+  'internalNotes' : [] | [string],
+  'laborCost' : number,
+  'laborRate' : number,
+}
 export interface _CaffeineStorageCreateCertificateResult {
   'method' : string,
   'blob_hash' : string,
@@ -121,6 +137,7 @@ export interface _SERVICE {
   'addInvoice' : ActorMethod<[Invoice], undefined>,
   'addJob' : ActorMethod<[Job], undefined>,
   'addService' : ActorMethod<[Service], undefined>,
+  'addVisit' : ActorMethod<[Visit], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'getActiveAddressesByCustomer' : ActorMethod<[string], Array<Address>>,
   'getAddress' : ActorMethod<[string], [] | [Address]>,
@@ -133,12 +150,16 @@ export interface _SERVICE {
   'getJobsByAddress' : ActorMethod<[string], Array<Job>>,
   'getSettings' : ActorMethod<[], Settings>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'getVisit' : ActorMethod<[string], [] | [Visit]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'listActiveCustomers' : ActorMethod<[], Array<Customer>>,
   'listAddressesByCustomer' : ActorMethod<[string], Array<Address>>,
+  'listVisitsByJob' : ActorMethod<[string], Array<Visit>>,
   'loadSeedData' : ActorMethod<[], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'updateJob' : ActorMethod<[Job], undefined>,
   'updateSettings' : ActorMethod<[Settings], undefined>,
+  'updateVisit' : ActorMethod<[Visit], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

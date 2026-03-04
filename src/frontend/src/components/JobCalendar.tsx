@@ -25,7 +25,14 @@ import {
   subMonths,
   subWeeks,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, MapPin, User } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCopy,
+  MapPin,
+  User,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Page } from "../App";
 import type { Address, Customer, Job } from "../backend.d.ts";
@@ -51,6 +58,8 @@ interface Props {
   jobs: JobEntry[];
   onSelectSlot: (start: Date, end: Date) => void;
   onSelectEvent: (entry: JobEntry) => void;
+  onRescheduleJob: (jobId: string, newStart: Date, newEnd: Date) => void;
+  onCopyJob: (sourceEntry: JobEntry, newStart: Date, newEnd: Date) => void;
   navigate: (p: Page) => void;
 }
 
@@ -114,12 +123,21 @@ function getStatusColor(status: string) {
 function EventPill({
   event,
   navigate,
+  isDragging,
+  onDragStart,
+  onCopyClick,
+  copiedJobId,
 }: {
   event: CalendarEvent;
   navigate: (p: Page) => void;
+  isDragging: boolean;
+  onDragStart: (e: React.DragEvent, event: CalendarEvent) => void;
+  onCopyClick: (entry: JobEntry) => void;
+  copiedJobId: string | null;
 }) {
   const color = getStatusColor(event.entry.job.status);
   const [open, setOpen] = useState(false);
+  const isCopied = copiedJobId === event.id;
 
   const timeStr = `${format(event.start, "h:mm a")} – ${format(event.end, "h:mm a")}`;
 
@@ -128,11 +146,20 @@ function EventPill({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="w-full text-left rounded-sm px-1.5 py-0.5 text-xs font-medium leading-tight truncate transition-opacity hover:opacity-90 focus:outline-none focus:ring-1 focus:ring-ring"
+          draggable
+          className={cn(
+            "w-full text-left rounded-sm px-1.5 py-0.5 text-xs font-medium leading-tight truncate transition-all hover:opacity-90 focus:outline-none focus:ring-1 focus:ring-ring cursor-grab active:cursor-grabbing select-none",
+            isDragging && "opacity-40 ring-2 ring-primary",
+            isCopied && "ring-2 ring-amber-400",
+          )}
           style={{
             backgroundColor: color.bg,
             borderLeft: `3px solid ${color.border}`,
             color: color.text,
+          }}
+          onDragStart={(e) => {
+            onDragStart(e, event);
+            setOpen(false);
           }}
           onClick={(e) => {
             e.stopPropagation();
@@ -172,21 +199,35 @@ function EventPill({
             </span>
           </div>
 
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full gap-2 text-xs h-8"
-            onClick={() => {
-              setOpen(false);
-              navigate({
-                view: "customer-detail",
-                customerId: event.entry.customer.id,
-              });
-            }}
-          >
-            <User className="w-3 h-3" />
-            View Customer
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 gap-1.5 text-xs h-8"
+              onClick={() => {
+                setOpen(false);
+                onCopyClick(event.entry);
+              }}
+            >
+              <ClipboardCopy className="w-3 h-3" />
+              Copy Job
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 gap-1.5 text-xs h-8"
+              onClick={() => {
+                setOpen(false);
+                navigate({
+                  view: "customer-detail",
+                  customerId: event.entry.customer.id,
+                });
+              }}
+            >
+              <User className="w-3 h-3" />
+              Customer
+            </Button>
+          </div>
         </div>
       </PopoverContent>
     </Popover>
@@ -200,6 +241,11 @@ function MonthDay({
   events,
   onSelectSlot,
   navigate,
+  draggingEventId,
+  onDragStart,
+  onDrop,
+  copiedJob,
+  onCopyClick,
 }: {
   date: Date;
   currentMonth: Date;
@@ -207,10 +253,16 @@ function MonthDay({
   onSelectSlot: (start: Date, end: Date) => void;
   onSelectEvent: (entry: JobEntry) => void;
   navigate: (p: Page) => void;
+  draggingEventId: string | null;
+  onDragStart: (e: React.DragEvent, event: CalendarEvent) => void;
+  onDrop: (targetDate: Date) => void;
+  copiedJob: JobEntry | null;
+  onCopyClick: (entry: JobEntry) => void;
 }) {
   const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
   const isTodayDate = isToday(date);
   const dayEvents = events.filter((e) => isSameDay(e.start, date));
+  const [isDragOver, setIsDragOver] = useState(false);
 
   return (
     <button
@@ -219,9 +271,21 @@ function MonthDay({
         "min-h-[100px] p-1.5 border-b border-r border-border cursor-pointer transition-colors select-none text-left w-full",
         "hover:bg-accent/20 focus:bg-accent/20 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         !isCurrentMonth && "bg-muted/30",
+        isDragOver && "bg-accent/30 ring-2 ring-inset ring-primary/40",
+        copiedJob && "hover:bg-amber-50/50 dark:hover:bg-amber-950/20",
       )}
       onClick={() => {
         onSelectSlot(startOfDay(date), endOfDay(date));
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsDragOver(true);
+      }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        onDrop(date);
       }}
     >
       <div
@@ -238,7 +302,15 @@ function MonthDay({
       </div>
       <div className="space-y-0.5">
         {dayEvents.slice(0, 3).map((event) => (
-          <EventPill key={event.id} event={event} navigate={navigate} />
+          <EventPill
+            key={event.id}
+            event={event}
+            navigate={navigate}
+            isDragging={draggingEventId === event.id}
+            onDragStart={onDragStart}
+            onCopyClick={onCopyClick}
+            copiedJobId={copiedJob?.job.id ?? null}
+          />
         ))}
         {dayEvents.length > 3 && (
           <p className="text-xs text-muted-foreground px-1">
@@ -258,11 +330,19 @@ function TimeSlotEvent({
   columnStart,
   totalColumns,
   navigate,
+  isDragging,
+  onDragStart,
+  onCopyClick,
+  copiedJobId,
 }: {
   event: CalendarEvent;
   columnStart: number;
   totalColumns: number;
   navigate: (p: Page) => void;
+  isDragging: boolean;
+  onDragStart: (e: React.DragEvent, event: CalendarEvent) => void;
+  onCopyClick: (entry: JobEntry) => void;
+  copiedJobId: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const color = getStatusColor(event.entry.job.status);
@@ -275,13 +355,19 @@ function TimeSlotEvent({
 
   const widthPercent = 100 / totalColumns;
   const leftPercent = columnStart * widthPercent;
+  const isCopied = copiedJobId === event.id;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="absolute rounded-sm px-1.5 py-1 text-xs font-medium leading-tight overflow-hidden transition-opacity hover:opacity-90 focus:outline-none focus:ring-1 focus:ring-ring z-10"
+          draggable
+          className={cn(
+            "absolute rounded-sm px-1.5 py-1 text-xs font-medium leading-tight overflow-hidden transition-all hover:opacity-90 focus:outline-none focus:ring-1 focus:ring-ring z-10 cursor-grab active:cursor-grabbing select-none",
+            isDragging && "opacity-40 ring-2 ring-primary",
+            isCopied && "ring-2 ring-amber-400",
+          )}
           style={{
             top: `${topPercent}%`,
             height: `${heightPercent}%`,
@@ -290,6 +376,10 @@ function TimeSlotEvent({
             backgroundColor: color.bg,
             borderLeft: `3px solid ${color.border}`,
             color: color.text,
+          }}
+          onDragStart={(e) => {
+            onDragStart(e, event);
+            setOpen(false);
           }}
           onClick={(e) => {
             e.stopPropagation();
@@ -329,21 +419,35 @@ function TimeSlotEvent({
               {formatCurrency(event.entry.job.cost)}
             </span>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full gap-2 text-xs h-8"
-            onClick={() => {
-              setOpen(false);
-              navigate({
-                view: "customer-detail",
-                customerId: event.entry.customer.id,
-              });
-            }}
-          >
-            <User className="w-3 h-3" />
-            View Customer
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 gap-1.5 text-xs h-8"
+              onClick={() => {
+                setOpen(false);
+                onCopyClick(event.entry);
+              }}
+            >
+              <ClipboardCopy className="w-3 h-3" />
+              Copy Job
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 gap-1.5 text-xs h-8"
+              onClick={() => {
+                setOpen(false);
+                navigate({
+                  view: "customer-detail",
+                  customerId: event.entry.customer.id,
+                });
+              }}
+            >
+              <User className="w-3 h-3" />
+              Customer
+            </Button>
+          </div>
         </div>
       </PopoverContent>
     </Popover>
@@ -356,12 +460,22 @@ function DayColumn({
   onSelectSlot,
   navigate,
   isToday: isTodayCol,
+  draggingEventId,
+  onDragStart,
+  onDropOnHour,
+  copiedJob,
+  onCopyClick,
 }: {
   date: Date;
   events: CalendarEvent[];
   onSelectSlot: (start: Date, end: Date) => void;
   navigate: (p: Page) => void;
   isToday: boolean;
+  draggingEventId: string | null;
+  onDragStart: (e: React.DragEvent, event: CalendarEvent) => void;
+  onDropOnHour: (targetDate: Date, targetHour: number) => void;
+  copiedJob: JobEntry | null;
+  onCopyClick: (entry: JobEntry) => void;
 }) {
   // Simple non-overlapping layout: assign column indices
   const positioned = events.map((e, idx) => ({
@@ -369,6 +483,8 @@ function DayColumn({
     columnStart: idx % 2,
     totalColumns: Math.min(events.length, 2),
   }));
+
+  const [dragOverHour, setDragOverHour] = useState<number | null>(null);
 
   return (
     <div
@@ -383,7 +499,14 @@ function DayColumn({
         <button
           type="button"
           key={h}
-          className="absolute w-full border-t border-border/50 cursor-pointer hover:bg-accent/10 transition-colors focus:outline-none"
+          className={cn(
+            "absolute w-full border-t border-border/50 cursor-pointer transition-colors focus:outline-none",
+            dragOverHour === h
+              ? "bg-accent/30"
+              : copiedJob
+                ? "hover:bg-amber-50/40 dark:hover:bg-amber-950/20"
+                : "hover:bg-accent/10",
+          )}
           style={{
             top: `${(h / 24) * 100}%`,
             height: `${(1 / 24) * 100}%`,
@@ -396,6 +519,16 @@ function DayColumn({
             end.setHours(h + 1, 0, 0, 0);
             onSelectSlot(start, end);
           }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOverHour(h);
+          }}
+          onDragLeave={() => setDragOverHour(null)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOverHour(null);
+            onDropOnHour(date, h);
+          }}
         />
       ))}
       {/* Events */}
@@ -406,6 +539,10 @@ function DayColumn({
           columnStart={columnStart}
           totalColumns={totalColumns}
           navigate={navigate}
+          isDragging={draggingEventId === event.id}
+          onDragStart={onDragStart}
+          onCopyClick={onCopyClick}
+          copiedJobId={copiedJob?.job.id ?? null}
         />
       ))}
     </div>
@@ -516,12 +653,22 @@ function MonthView({
   onSelectSlot,
   onSelectEvent,
   navigate,
+  draggingEventId,
+  onDragStart,
+  onDrop,
+  copiedJob,
+  onCopyClick,
 }: {
   date: Date;
   events: CalendarEvent[];
   onSelectSlot: (start: Date, end: Date) => void;
   onSelectEvent: (entry: JobEntry) => void;
   navigate: (p: Page) => void;
+  draggingEventId: string | null;
+  onDragStart: (e: React.DragEvent, event: CalendarEvent) => void;
+  onDrop: (targetDate: Date) => void;
+  copiedJob: JobEntry | null;
+  onCopyClick: (entry: JobEntry) => void;
 }) {
   const monthStart = startOfMonth(date);
   const monthEnd = endOfMonth(date);
@@ -555,6 +702,11 @@ function MonthView({
             onSelectSlot={onSelectSlot}
             onSelectEvent={onSelectEvent}
             navigate={navigate}
+            draggingEventId={draggingEventId}
+            onDragStart={onDragStart}
+            onDrop={onDrop}
+            copiedJob={copiedJob}
+            onCopyClick={onCopyClick}
           />
         ))}
       </div>
@@ -568,11 +720,21 @@ function WeekView({
   events,
   onSelectSlot,
   navigate,
+  draggingEventId,
+  onDragStart,
+  onDropOnHour,
+  copiedJob,
+  onCopyClick,
 }: {
   date: Date;
   events: CalendarEvent[];
   onSelectSlot: (start: Date, end: Date) => void;
   navigate: (p: Page) => void;
+  draggingEventId: string | null;
+  onDragStart: (e: React.DragEvent, event: CalendarEvent) => void;
+  onDropOnHour: (targetDate: Date, targetHour: number) => void;
+  copiedJob: JobEntry | null;
+  onCopyClick: (entry: JobEntry) => void;
 }) {
   const weekStart = startOfWeek(date);
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -640,6 +802,11 @@ function WeekView({
                   onSelectSlot={onSelectSlot}
                   navigate={navigate}
                   isToday={isToday(d)}
+                  draggingEventId={draggingEventId}
+                  onDragStart={onDragStart}
+                  onDropOnHour={onDropOnHour}
+                  copiedJob={copiedJob}
+                  onCopyClick={onCopyClick}
                 />
               </div>
             );
@@ -656,11 +823,21 @@ function DayViewComponent({
   events,
   onSelectSlot,
   navigate,
+  draggingEventId,
+  onDragStart,
+  onDropOnHour,
+  copiedJob,
+  onCopyClick,
 }: {
   date: Date;
   events: CalendarEvent[];
   onSelectSlot: (start: Date, end: Date) => void;
   navigate: (p: Page) => void;
+  draggingEventId: string | null;
+  onDragStart: (e: React.DragEvent, event: CalendarEvent) => void;
+  onDropOnHour: (targetDate: Date, targetHour: number) => void;
+  copiedJob: JobEntry | null;
+  onCopyClick: (entry: JobEntry) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const dayEvents = events.filter((e) => isSameDay(e.start, date));
@@ -716,6 +893,11 @@ function DayViewComponent({
               onSelectSlot={onSelectSlot}
               navigate={navigate}
               isToday={isToday(date)}
+              draggingEventId={draggingEventId}
+              onDragStart={onDragStart}
+              onDropOnHour={onDropOnHour}
+              copiedJob={copiedJob}
+              onCopyClick={onCopyClick}
             />
           </div>
         </div>
@@ -729,10 +911,15 @@ export function JobCalendar({
   jobs,
   onSelectSlot,
   onSelectEvent,
+  onRescheduleJob,
+  onCopyJob,
   navigate,
 }: Props) {
   const [view, setView] = useState<CalView>("month");
   const [date, setDate] = useState(new Date());
+  const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
+  const [copiedJob, setCopiedJob] = useState<JobEntry | null>(null);
+  const draggingEventRef = useRef<CalendarEvent | null>(null);
 
   // Convert jobs to calendar events
   const events: CalendarEvent[] = jobs
@@ -754,11 +941,71 @@ export function JobCalendar({
     })
     .filter((e): e is CalendarEvent => e !== null);
 
+  function handleDragStart(e: React.DragEvent, event: CalendarEvent) {
+    e.dataTransfer.setData("text/plain", event.id);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggingEventId(event.id);
+    draggingEventRef.current = event;
+  }
+
+  function handleDropOnDate(targetDate: Date) {
+    const calEvent = draggingEventRef.current;
+    if (!calEvent) return;
+    setDraggingEventId(null);
+    draggingEventRef.current = null;
+
+    // Compute original duration in ms
+    const durationMs = calEvent.end.getTime() - calEvent.start.getTime();
+    const newStart = startOfDay(targetDate);
+    const newEnd = new Date(newStart.getTime() + durationMs);
+
+    onRescheduleJob(calEvent.id, newStart, newEnd);
+  }
+
+  function handleDropOnHour(targetDate: Date, targetHour: number) {
+    const calEvent = draggingEventRef.current;
+    if (!calEvent) {
+      // If no drag, check if we have a slot-click with copiedJob
+      return;
+    }
+    setDraggingEventId(null);
+    draggingEventRef.current = null;
+
+    const durationMs = calEvent.end.getTime() - calEvent.start.getTime();
+    const newStart = new Date(targetDate);
+    newStart.setHours(targetHour, 0, 0, 0);
+    const newEnd = new Date(newStart.getTime() + durationMs);
+
+    onRescheduleJob(calEvent.id, newStart, newEnd);
+  }
+
+  function handleSelectSlot(start: Date, end: Date) {
+    if (copiedJob) {
+      // Paste the copied job onto this slot
+      const durationMs =
+        nsToDate(copiedJob.job.endTime).getTime() -
+        nsToDate(copiedJob.job.startTime).getTime();
+      const newEnd = new Date(start.getTime() + durationMs);
+      onCopyJob(copiedJob, start, newEnd);
+      setCopiedJob(null);
+    } else {
+      onSelectSlot(start, end);
+    }
+  }
+
+  function handleCopyClick(entry: JobEntry) {
+    setCopiedJob(entry);
+  }
+
   return (
     <div
       data-ocid="jobs.calendar_section"
       className="flex flex-col rounded-lg border border-border bg-background overflow-hidden shadow-card"
       style={{ minHeight: "600px" }}
+      onDragEnd={() => {
+        setDraggingEventId(null);
+        draggingEventRef.current = null;
+      }}
     >
       <CalendarToolbar
         date={date}
@@ -767,29 +1014,71 @@ export function JobCalendar({
         onViewChange={setView}
       />
 
+      {/* Copy paste banner */}
+      {copiedJob && (
+        <div
+          data-ocid="jobs.calendar.copy_banner"
+          className="flex items-center justify-between gap-3 px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300"
+        >
+          <div className="flex items-center gap-2 text-sm">
+            <ClipboardCopy className="w-4 h-4 shrink-0" />
+            <span className="font-medium">
+              Job copied —{" "}
+              <span className="font-bold">{copiedJob.customer.name}</span>
+            </span>
+            <span className="text-xs opacity-70">
+              Click any date/time slot to paste
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCopiedJob(null)}
+            className="p-1 rounded hover:bg-amber-200/50 dark:hover:bg-amber-900/50 transition-colors"
+            aria-label="Clear copied job"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {view === "month" && (
         <MonthView
           date={date}
           events={events}
-          onSelectSlot={onSelectSlot}
+          onSelectSlot={handleSelectSlot}
           onSelectEvent={onSelectEvent}
           navigate={navigate}
+          draggingEventId={draggingEventId}
+          onDragStart={handleDragStart}
+          onDrop={handleDropOnDate}
+          copiedJob={copiedJob}
+          onCopyClick={handleCopyClick}
         />
       )}
       {view === "week" && (
         <WeekView
           date={date}
           events={events}
-          onSelectSlot={onSelectSlot}
+          onSelectSlot={handleSelectSlot}
           navigate={navigate}
+          draggingEventId={draggingEventId}
+          onDragStart={handleDragStart}
+          onDropOnHour={handleDropOnHour}
+          copiedJob={copiedJob}
+          onCopyClick={handleCopyClick}
         />
       )}
       {view === "day" && (
         <DayViewComponent
           date={date}
           events={events}
-          onSelectSlot={onSelectSlot}
+          onSelectSlot={handleSelectSlot}
           navigate={navigate}
+          draggingEventId={draggingEventId}
+          onDragStart={handleDragStart}
+          onDropOnHour={handleDropOnHour}
+          copiedJob={copiedJob}
+          onCopyClick={handleCopyClick}
         />
       )}
     </div>

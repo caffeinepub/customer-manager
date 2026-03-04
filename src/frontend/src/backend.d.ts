@@ -7,17 +7,14 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
-export interface Address {
+export interface Customer {
     id: string;
-    street: string;
-    country: string;
-    city: string;
-    postalCode: string;
-    state: string;
-    isPrimary: boolean;
-    addressLabel: string;
+    name: string;
+    tags: Array<string>;
+    isActive: boolean;
+    email: string;
     notes?: string;
-    customerId: string;
+    phone: string;
 }
 export interface Settings {
     invoiceStartingNumber: bigint;
@@ -44,6 +41,18 @@ export interface Job {
     serviceId: string;
 }
 export type Time = bigint;
+export interface Address {
+    id: string;
+    street: string;
+    country: string;
+    city: string;
+    postalCode: string;
+    state: string;
+    isPrimary: boolean;
+    addressLabel: string;
+    notes?: string;
+    customerId: string;
+}
 export interface Service {
     id: string;
     name: string;
@@ -66,14 +75,21 @@ export interface Invoice {
     timeBlockIds: Array<string>;
     customerId: string;
 }
-export interface Customer {
+export interface Visit {
     id: string;
-    name: string;
-    tags: Array<string>;
-    isActive: boolean;
-    email: string;
+    startTime?: Time;
+    status: string;
+    endTime?: Time;
+    scheduledDate: Time;
+    createdAt: Time;
+    laborHours: number;
+    jobId: string;
+    photoIds: Array<string>;
+    updatedAt: Time;
     notes?: string;
-    phone: string;
+    internalNotes?: string;
+    laborCost: number;
+    laborRate: number;
 }
 export interface UserProfile {
     name: string;
@@ -93,6 +109,7 @@ export interface backendInterface {
     addInvoice(invoice: Invoice): Promise<void>;
     addJob(job: Job): Promise<void>;
     addService(service: Service): Promise<void>;
+    addVisit(visit: Visit): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     getActiveAddressesByCustomer(customerId: string): Promise<Array<Address>>;
     getAddress(id: string): Promise<Address | null>;
@@ -105,10 +122,14 @@ export interface backendInterface {
     getJobsByAddress(addressId: string): Promise<Array<Job>>;
     getSettings(): Promise<Settings>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
+    getVisit(id: string): Promise<Visit | null>;
     isCallerAdmin(): Promise<boolean>;
     listActiveCustomers(): Promise<Array<Customer>>;
     listAddressesByCustomer(customerId: string): Promise<Array<Address>>;
+    listVisitsByJob(jobId: string): Promise<Array<Visit>>;
     loadSeedData(): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    updateJob(job: Job): Promise<void>;
     updateSettings(newSettings: Settings): Promise<void>;
+    updateVisit(visit: Visit): Promise<void>;
 }

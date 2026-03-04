@@ -75,6 +75,22 @@ export const Service = IDL.Record({
   'price' : IDL.Float64,
   'laborRate' : IDL.Float64,
 });
+export const Visit = IDL.Record({
+  'id' : IDL.Text,
+  'startTime' : IDL.Opt(Time),
+  'status' : IDL.Text,
+  'endTime' : IDL.Opt(Time),
+  'scheduledDate' : Time,
+  'createdAt' : Time,
+  'laborHours' : IDL.Float64,
+  'jobId' : IDL.Text,
+  'photoIds' : IDL.Vec(IDL.Text),
+  'updatedAt' : Time,
+  'notes' : IDL.Opt(IDL.Text),
+  'internalNotes' : IDL.Opt(IDL.Text),
+  'laborCost' : IDL.Float64,
+  'laborRate' : IDL.Float64,
+});
 export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
   'user' : IDL.Null,
@@ -133,6 +149,7 @@ export const idlService = IDL.Service({
   'addInvoice' : IDL.Func([Invoice], [], []),
   'addJob' : IDL.Func([Job], [], []),
   'addService' : IDL.Func([Service], [], []),
+  'addVisit' : IDL.Func([Visit], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'getActiveAddressesByCustomer' : IDL.Func(
       [IDL.Text],
@@ -153,6 +170,7 @@ export const idlService = IDL.Service({
       [IDL.Opt(UserProfile)],
       ['query'],
     ),
+  'getVisit' : IDL.Func([IDL.Text], [IDL.Opt(Visit)], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'listActiveCustomers' : IDL.Func([], [IDL.Vec(Customer)], ['query']),
   'listAddressesByCustomer' : IDL.Func(
@@ -160,9 +178,12 @@ export const idlService = IDL.Service({
       [IDL.Vec(Address)],
       ['query'],
     ),
+  'listVisitsByJob' : IDL.Func([IDL.Text], [IDL.Vec(Visit)], ['query']),
   'loadSeedData' : IDL.Func([], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'updateJob' : IDL.Func([Job], [], []),
   'updateSettings' : IDL.Func([Settings], [], []),
+  'updateVisit' : IDL.Func([Visit], [], []),
 });
 
 export const idlInitArgs = [];
@@ -235,6 +256,22 @@ export const idlFactory = ({ IDL }) => {
     'price' : IDL.Float64,
     'laborRate' : IDL.Float64,
   });
+  const Visit = IDL.Record({
+    'id' : IDL.Text,
+    'startTime' : IDL.Opt(Time),
+    'status' : IDL.Text,
+    'endTime' : IDL.Opt(Time),
+    'scheduledDate' : Time,
+    'createdAt' : Time,
+    'laborHours' : IDL.Float64,
+    'jobId' : IDL.Text,
+    'photoIds' : IDL.Vec(IDL.Text),
+    'updatedAt' : Time,
+    'notes' : IDL.Opt(IDL.Text),
+    'internalNotes' : IDL.Opt(IDL.Text),
+    'laborCost' : IDL.Float64,
+    'laborRate' : IDL.Float64,
+  });
   const UserRole = IDL.Variant({
     'admin' : IDL.Null,
     'user' : IDL.Null,
@@ -293,6 +330,7 @@ export const idlFactory = ({ IDL }) => {
     'addInvoice' : IDL.Func([Invoice], [], []),
     'addJob' : IDL.Func([Job], [], []),
     'addService' : IDL.Func([Service], [], []),
+    'addVisit' : IDL.Func([Visit], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'getActiveAddressesByCustomer' : IDL.Func(
         [IDL.Text],
@@ -317,6 +355,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(UserProfile)],
         ['query'],
       ),
+    'getVisit' : IDL.Func([IDL.Text], [IDL.Opt(Visit)], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'listActiveCustomers' : IDL.Func([], [IDL.Vec(Customer)], ['query']),
     'listAddressesByCustomer' : IDL.Func(
@@ -324,9 +363,12 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(Address)],
         ['query'],
       ),
+    'listVisitsByJob' : IDL.Func([IDL.Text], [IDL.Vec(Visit)], ['query']),
     'loadSeedData' : IDL.Func([], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'updateJob' : IDL.Func([Job], [], []),
     'updateSettings' : IDL.Func([Settings], [], []),
+    'updateVisit' : IDL.Func([Visit], [], []),
   });
 };
 

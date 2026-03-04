@@ -25,7 +25,8 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { Page } from "../App";
 import type { Address, Customer, Job } from "../backend.d.ts";
-import { JobCalendar } from "../components/JobCalendar";
+import { JobCalendar, type JobEntry } from "../components/JobCalendar";
+import { JobDetailSheet } from "../components/JobDetailSheet";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { useActor } from "../hooks/useActor";
@@ -36,6 +37,7 @@ import {
   useAddJob,
   useAddressesByCustomer,
   useCustomers,
+  useUpdateJob,
 } from "../hooks/useQueries";
 
 interface Props {
@@ -320,11 +322,17 @@ function AddJobDialog({
 export function JobsPage({ navigate }: Props) {
   const { data: customers = [], isLoading: customersLoading } = useCustomers();
   const { data: allJobs = [], isLoading: jobsLoading } = useAllJobs(customers);
+  const updateJob = useUpdateJob();
+  const addJob = useAddJob();
   const [showAdd, setShowAdd] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [slotStart, setSlotStart] = useState<Date | undefined>();
   const [slotEnd, setSlotEnd] = useState<Date | undefined>();
+
+  // Job detail sheet state
+  const [detailEntry, setDetailEntry] = useState<JobEntry | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const isLoading = customersLoading || jobsLoading;
 
@@ -354,6 +362,49 @@ export function JobsPage({ navigate }: Props) {
     setShowAdd(false);
     setSlotStart(undefined);
     setSlotEnd(undefined);
+  }
+
+  async function handleRescheduleJob(
+    jobId: string,
+    newStart: Date,
+    newEnd: Date,
+  ) {
+    const entry = allJobs.find((j) => j.job.id === jobId);
+    if (!entry) return;
+    try {
+      await updateJob.mutateAsync({
+        ...entry.job,
+        startTime: dateToNs(newStart),
+        endTime: dateToNs(newEnd),
+      });
+      toast.success("Job rescheduled");
+    } catch {
+      toast.error("Failed to reschedule job");
+    }
+  }
+
+  async function handleCopyJob(
+    sourceEntry: JobEntry,
+    newStart: Date,
+    newEnd: Date,
+  ) {
+    const newJob: Job = {
+      ...sourceEntry.job,
+      id: crypto.randomUUID(),
+      startTime: dateToNs(newStart),
+      endTime: dateToNs(newEnd),
+    };
+    try {
+      await addJob.mutateAsync(newJob);
+      toast.success("Job copied successfully");
+    } catch {
+      toast.error("Failed to copy job");
+    }
+  }
+
+  function handleRowClick(entry: JobEntry) {
+    setDetailEntry(entry);
+    setDetailOpen(true);
   }
 
   return (
@@ -462,12 +513,7 @@ export function JobsPage({ navigate }: Props) {
                     type="button"
                     key={job.id}
                     data-ocid={`jobs.item.${idx + 1}`}
-                    onClick={() =>
-                      navigate({
-                        view: "customer-detail",
-                        customerId: customer.id,
-                      })
-                    }
+                    onClick={() => handleRowClick({ job, customer, address })}
                     className="w-full px-4 py-3 grid grid-cols-12 gap-4 items-center hover:bg-accent/30 transition-colors border-b border-border last:border-0 text-left"
                   >
                     <div className="col-span-3">
@@ -514,6 +560,8 @@ export function JobsPage({ navigate }: Props) {
                   customerId: entry.customer.id,
                 })
               }
+              onRescheduleJob={handleRescheduleJob}
+              onCopyJob={handleCopyJob}
               navigate={navigate}
             />
           ))}
@@ -525,6 +573,16 @@ export function JobsPage({ navigate }: Props) {
         customers={customers}
         defaultStartDate={slotStart}
         defaultEndDate={slotEnd}
+      />
+
+      {/* Job Detail Sheet */}
+      <JobDetailSheet
+        open={detailOpen}
+        onClose={() => {
+          setDetailOpen(false);
+          setDetailEntry(null);
+        }}
+        jobEntry={detailEntry}
       />
     </div>
   );

@@ -11,6 +11,8 @@ import Storage "blob-storage/Storage";
 import AccessControl "authorization/access-control";
 import MixinStorage "blob-storage/Mixin";
 
+
+
 actor {
   include MixinStorage();
 
@@ -169,6 +171,23 @@ actor {
     isActive : Bool;
   };
 
+  public type Visit = {
+    id : Text;
+    jobId : Text;
+    scheduledDate : Time.Time;
+    startTime : ?Time.Time;
+    endTime : ?Time.Time;
+    status : Text;
+    notes : ?Text;
+    internalNotes : ?Text;
+    laborHours : Float;
+    laborRate : Float;
+    laborCost : Float;
+    photoIds : [Text];
+    createdAt : Time.Time;
+    updatedAt : Time.Time;
+  };
+
   // Storage (persistent via stable Maps)
   let customerMap = Map.empty<Text, Customer>();
   let addressMap = Map.empty<Text, Address>();
@@ -184,6 +203,7 @@ actor {
   let expenseMap = Map.empty<Text, Expense>();
   let userProfiles = Map.empty<Principal, UserProfile>();
   let fileReferences = Map.empty<Text, Storage.ExternalBlob>();
+  let visitMap = Map.empty<Text, Visit>();
 
   var settings : Settings = {
     defaultLaborRate = 50.0;
@@ -388,6 +408,52 @@ actor {
       Runtime.trap("Unauthorized: Only admins can update settings");
     };
     settings := newSettings;
+  };
+
+  // Visit CRUD
+  public shared ({ caller }) func addVisit(visit : Visit) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can add visits");
+    };
+    visitMap.add(visit.id, visit);
+  };
+
+  public query ({ caller }) func getVisit(id : Text) : async ?Visit {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can get visits");
+    };
+    visitMap.get(id);
+  };
+
+  public query ({ caller }) func listVisitsByJob(jobId : Text) : async [Visit] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can list visits");
+    };
+    visitMap.values().toArray().filter(
+      func(v) {
+        v.jobId == jobId;
+      }
+    );
+  };
+
+  public shared ({ caller }) func updateVisit(visit : Visit) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can update visits");
+    };
+    switch (visitMap.get(visit.id)) {
+      case (null) { Runtime.trap("Visit does not exist: " # visit.id) };
+      case (?_) { visitMap.add(visit.id, visit) };
+    };
+  };
+
+  public shared ({ caller }) func updateJob(job : Job) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can update jobs");
+    };
+    switch (jobMap.get(job.id)) {
+      case (null) { Runtime.trap("Job not found: " # job.id) };
+      case (?_) { jobMap.add(job.id, job) };
+    };
   };
 
   //----------------------

@@ -7,6 +7,7 @@ import type {
   Service,
   Settings,
   UserProfile,
+  Visit,
 } from "../backend.d.ts";
 import { useActor } from "./useActor";
 
@@ -143,6 +144,65 @@ export function useAddJob() {
         queryKey: ["jobs-for-customer", vars.customerId],
       });
       qc.invalidateQueries({ queryKey: ["all-jobs"] });
+    },
+  });
+}
+
+export function useUpdateJob() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (job: Job) => {
+      if (!actor) throw new Error("No actor");
+      return actor.updateJob(job);
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["all-jobs"] });
+      qc.invalidateQueries({ queryKey: ["jobs-by-address", vars.addressId] });
+      qc.invalidateQueries({
+        queryKey: ["jobs-for-customer", vars.customerId],
+      });
+    },
+  });
+}
+
+// ─── Visits ───────────────────────────────────────────────────
+export function useListVisitsByJob(jobId: string) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Visit[]>({
+    queryKey: ["visits", jobId],
+    queryFn: async () => {
+      if (!actor || !jobId) return [];
+      return actor.listVisitsByJob(jobId);
+    },
+    enabled: !!actor && !isFetching && !!jobId,
+  });
+}
+
+export function useAddVisit() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (visit: Visit) => {
+      if (!actor) throw new Error("No actor");
+      return actor.addVisit(visit);
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["visits", vars.jobId] });
+    },
+  });
+}
+
+export function useUpdateVisit() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (visit: Visit) => {
+      if (!actor) throw new Error("No actor");
+      return actor.updateVisit(visit);
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["visits", vars.jobId] });
     },
   });
 }
