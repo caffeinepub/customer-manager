@@ -41,6 +41,18 @@ export const Customer = IDL.Record({
   'phone' : IDL.Text,
 });
 export const Time = IDL.Int;
+export const Expense = IDL.Record({
+  'id' : IDL.Text,
+  'expenseType' : IDL.Text,
+  'dateIncurred' : Time,
+  'jobId' : IDL.Opt(IDL.Text),
+  'description' : IDL.Text,
+  'notes' : IDL.Opt(IDL.Text),
+  'visitId' : IDL.Opt(IDL.Text),
+  'amount' : IDL.Float64,
+  'vendorName' : IDL.Opt(IDL.Text),
+  'receiptBlobId' : IDL.Opt(IDL.Text),
+});
 export const Invoice = IDL.Record({
   'id' : IDL.Text,
   'status' : IDL.Text,
@@ -146,11 +158,13 @@ export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'addAddress' : IDL.Func([Address], [], []),
   'addCustomer' : IDL.Func([Customer], [], []),
+  'addExpense' : IDL.Func([Expense], [], []),
   'addInvoice' : IDL.Func([Invoice], [], []),
   'addJob' : IDL.Func([Job], [], []),
   'addService' : IDL.Func([Service], [], []),
   'addVisit' : IDL.Func([Visit], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'deleteExpense' : IDL.Func([IDL.Text], [], []),
   'getActiveAddressesByCustomer' : IDL.Func(
       [IDL.Text],
       [IDL.Vec(Address)],
@@ -178,9 +192,13 @@ export const idlService = IDL.Service({
       [IDL.Vec(Address)],
       ['query'],
     ),
+  'listAllExpenses' : IDL.Func([], [IDL.Vec(Expense)], ['query']),
+  'listExpensesByJob' : IDL.Func([IDL.Text], [IDL.Vec(Expense)], ['query']),
+  'listExpensesByVisit' : IDL.Func([IDL.Text], [IDL.Vec(Expense)], ['query']),
   'listVisitsByJob' : IDL.Func([IDL.Text], [IDL.Vec(Visit)], ['query']),
   'loadSeedData' : IDL.Func([], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'updateExpense' : IDL.Func([Expense], [], []),
   'updateJob' : IDL.Func([Job], [], []),
   'updateSettings' : IDL.Func([Settings], [], []),
   'updateVisit' : IDL.Func([Visit], [], []),
@@ -222,6 +240,18 @@ export const idlFactory = ({ IDL }) => {
     'phone' : IDL.Text,
   });
   const Time = IDL.Int;
+  const Expense = IDL.Record({
+    'id' : IDL.Text,
+    'expenseType' : IDL.Text,
+    'dateIncurred' : Time,
+    'jobId' : IDL.Opt(IDL.Text),
+    'description' : IDL.Text,
+    'notes' : IDL.Opt(IDL.Text),
+    'visitId' : IDL.Opt(IDL.Text),
+    'amount' : IDL.Float64,
+    'vendorName' : IDL.Opt(IDL.Text),
+    'receiptBlobId' : IDL.Opt(IDL.Text),
+  });
   const Invoice = IDL.Record({
     'id' : IDL.Text,
     'status' : IDL.Text,
@@ -327,11 +357,13 @@ export const idlFactory = ({ IDL }) => {
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'addAddress' : IDL.Func([Address], [], []),
     'addCustomer' : IDL.Func([Customer], [], []),
+    'addExpense' : IDL.Func([Expense], [], []),
     'addInvoice' : IDL.Func([Invoice], [], []),
     'addJob' : IDL.Func([Job], [], []),
     'addService' : IDL.Func([Service], [], []),
     'addVisit' : IDL.Func([Visit], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'deleteExpense' : IDL.Func([IDL.Text], [], []),
     'getActiveAddressesByCustomer' : IDL.Func(
         [IDL.Text],
         [IDL.Vec(Address)],
@@ -363,9 +395,13 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(Address)],
         ['query'],
       ),
+    'listAllExpenses' : IDL.Func([], [IDL.Vec(Expense)], ['query']),
+    'listExpensesByJob' : IDL.Func([IDL.Text], [IDL.Vec(Expense)], ['query']),
+    'listExpensesByVisit' : IDL.Func([IDL.Text], [IDL.Vec(Expense)], ['query']),
     'listVisitsByJob' : IDL.Func([IDL.Text], [IDL.Vec(Visit)], ['query']),
     'loadSeedData' : IDL.Func([], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'updateExpense' : IDL.Func([Expense], [], []),
     'updateJob' : IDL.Func([Job], [], []),
     'updateSettings' : IDL.Func([Settings], [], []),
     'updateVisit' : IDL.Func([Visit], [], []),

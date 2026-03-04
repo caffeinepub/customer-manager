@@ -10,9 +10,9 @@ import MixinAuthorization "authorization/MixinAuthorization";
 import Storage "blob-storage/Storage";
 import AccessControl "authorization/access-control";
 import MixinStorage "blob-storage/Mixin";
+import Migration "migration";
 
-
-
+(with migration = Migration.run)
 actor {
   include MixinStorage();
 
@@ -148,6 +148,10 @@ actor {
     expenseType : Text;
     dateIncurred : Time.Time;
     notes : ?Text;
+    jobId : ?Text;
+    visitId : ?Text;
+    vendorName : ?Text;
+    receiptBlobId : ?Text;
   };
 
   public type Settings = {
@@ -200,7 +204,7 @@ actor {
   let invoiceMap = Map.empty<Text, Invoice>();
   let paymentMap = Map.empty<Text, Payment>();
   let modifierMap = Map.empty<Text, Modifier>();
-  let expenseMap = Map.empty<Text, Expense>();
+  let expenseMap = Map.empty<Text, Expense>(); // Now includes persistent expenseMap
   let userProfiles = Map.empty<Principal, UserProfile>();
   let fileReferences = Map.empty<Text, Storage.ExternalBlob>();
   let visitMap = Map.empty<Text, Visit>();
@@ -502,5 +506,79 @@ actor {
       companyEmail = "test@test.com";
       companyAddress = "345 Testing Blvd, Test City, US";
     };
+  };
+
+  // --------------
+  // Expense Management
+  // --------------
+
+  public shared ({ caller }) func addExpense(expense : Expense) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can add expenses");
+    };
+    if (expense.amount <= 0) {
+      Runtime.trap("Error: Expense amount must be greater than 0");
+    };
+    expenseMap.add(expense.id, expense);
+  };
+
+  public shared ({ caller }) func updateExpense(expense : Expense) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can update expenses");
+    };
+    switch (expenseMap.get(expense.id)) {
+      case (null) { Runtime.trap("Expense does not exist: " # expense.id) };
+      case (?_) {
+        if (expense.amount <= 0) {
+          Runtime.trap("Error: Expense amount must be greater than 0");
+        };
+        expenseMap.add(expense.id, expense);
+      };
+    };
+  };
+
+  public shared ({ caller }) func deleteExpense(id : Text) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can delete expenses");
+    };
+    switch (expenseMap.get(id)) {
+      case (null) { Runtime.trap("Expense does not exist and cannot be deleted: " # id) };
+      case (?_) { expenseMap.remove(id) };
+    };
+  };
+
+  public query ({ caller }) func listExpensesByJob(jobId : Text) : async [Expense] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can list expenses");
+    };
+    expenseMap.values().toArray().filter(
+      func(exp) {
+        switch (exp.jobId) {
+          case (null) { false };
+          case (?_jobId) { _jobId == jobId };
+        };
+      }
+    );
+  };
+
+  public query ({ caller }) func listExpensesByVisit(visitId : Text) : async [Expense] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can list expenses");
+    };
+    expenseMap.values().toArray().filter(
+      func(exp) {
+        switch (exp.visitId) {
+          case (null) { false };
+          case (?_visitId) { _visitId == visitId };
+        };
+      }
+    );
+  };
+
+  public query ({ caller }) func listAllExpenses() : async [Expense] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can list expenses");
+    };
+    expenseMap.values().toArray();
   };
 };

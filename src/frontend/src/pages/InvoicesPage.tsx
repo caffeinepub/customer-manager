@@ -8,15 +8,30 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, Download, FileText, Plus } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  Download,
+  Eye,
+  FileText,
+  MoreHorizontal,
+  Plus,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Page } from "../App";
-import type { Customer } from "../backend.d.ts";
+import type { Customer, Invoice } from "../backend.d.ts";
 import { CreateInvoiceSheet } from "../components/CreateInvoiceSheet";
+import { InvoicePreviewModal } from "../components/InvoicePreviewModal";
+import { MarkAsPaidDialog } from "../components/MarkAsPaidDialog";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { useActor } from "../hooks/useActor";
-import { formatCurrency, formatDate, useCustomers } from "../hooks/useQueries";
+import {
+  formatCurrency,
+  formatDate,
+  useCustomers,
+  useSettings,
+} from "../hooks/useQueries";
 
 interface Props {
   navigate: (p: Page) => void;
@@ -42,13 +57,97 @@ function useAllInvoices(customers: Customer[]) {
   });
 }
 
+// ─── Row Actions ──────────────────────────────────────────────
+interface RowActionsProps {
+  invoice: Invoice;
+  customer: Customer;
+  onPreview: () => void;
+  onMarkPaid: () => void;
+}
+
+function InvoiceRowActions({
+  invoice,
+  onPreview,
+  onMarkPaid,
+}: RowActionsProps) {
+  const canMarkPaid = invoice.status !== "paid" && invoice.status !== "void";
+
+  return (
+    <div className="flex items-center gap-1 justify-end">
+      {/* Eye / Preview button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+        onClick={(e) => {
+          e.stopPropagation();
+          onPreview();
+        }}
+        title="View Preview"
+        data-ocid="invoices.preview.open_modal_button"
+      >
+        <Eye className="w-3.5 h-3.5" />
+      </Button>
+
+      {/* 3-dot dropdown */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            onClick={(e) => e.stopPropagation()}
+            data-ocid="invoices.row.dropdown_menu"
+          >
+            <MoreHorizontal className="w-3.5 h-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuItem
+            className="gap-2 cursor-pointer"
+            onSelect={onPreview}
+          >
+            <Eye className="w-4 h-4" />
+            View Preview
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="gap-2 cursor-pointer"
+            onSelect={onMarkPaid}
+            disabled={!canMarkPaid}
+          >
+            <CheckCircle2
+              className={`w-4 h-4 ${canMarkPaid ? "text-emerald-500" : "text-muted-foreground"}`}
+            />
+            Mark as Paid
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────
 export function InvoicesPage({ navigate }: Props) {
   const { data: customers = [], isLoading: customersLoading } = useCustomers();
   const { data: allInvoices = [], isLoading: invLoading } =
     useAllInvoices(customers);
+  const { data: settings } = useSettings();
+
   const [showCreate, setShowCreate] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+
+  // Preview modal state
+  const [previewInvoice, setPreviewInvoice] = useState<{
+    invoice: Invoice;
+    customer: Customer;
+  } | null>(null);
+
+  // Mark as paid dialog state
+  const [markPaidInvoice, setMarkPaidInvoice] = useState<{
+    invoice: Invoice;
+    customer: Customer;
+  } | null>(null);
 
   const isLoading = customersLoading || invLoading;
 
@@ -125,7 +224,7 @@ export function InvoicesPage({ navigate }: Props) {
 
         {/* Invoices list */}
         {isLoading ? (
-          <div className="space-y-3">
+          <div className="space-y-3" data-ocid="invoices.loading_state">
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-16 w-full rounded-lg" />
             ))}
@@ -144,57 +243,107 @@ export function InvoicesPage({ navigate }: Props) {
           </div>
         ) : (
           <div className="border border-border rounded-lg overflow-hidden shadow-card">
-            <div className="bg-muted/50 px-4 py-2.5 grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground border-b border-border">
+            {/* Column headers — now 13 cols: Customer(3) ID(2) Issued(2) Due(2) Amount(2) Status(1) Actions(1) */}
+            <div className="bg-muted/50 px-4 py-2.5 grid grid-cols-13 gap-4 text-xs font-medium text-muted-foreground border-b border-border">
               <span className="col-span-3">Customer</span>
               <span className="col-span-2">Invoice ID</span>
               <span className="col-span-2">Issued</span>
               <span className="col-span-2">Due</span>
               <span className="col-span-2">Amount</span>
               <span className="col-span-1">Status</span>
+              <span className="col-span-1 text-right">Actions</span>
             </div>
             {filtered.map(({ invoice, customer }, idx) => (
-              <button
-                type="button"
+              <div
                 key={invoice.id}
                 data-ocid={`invoices.item.${idx + 1}`}
-                onClick={() =>
-                  navigate({ view: "customer-detail", customerId: customer.id })
-                }
-                className="w-full px-4 py-3 grid grid-cols-12 gap-4 items-center hover:bg-accent/30 transition-colors border-b border-border last:border-0 text-left"
+                className="w-full px-4 py-3 grid grid-cols-13 gap-4 items-center hover:bg-accent/30 transition-colors border-b border-border last:border-0"
               >
-                <div className="col-span-3">
-                  <p className="text-sm font-medium text-foreground truncate">
+                {/* Customer name — clickable */}
+                <button
+                  type="button"
+                  className="col-span-3 text-left"
+                  onClick={() =>
+                    navigate({
+                      view: "customer-detail",
+                      customerId: customer.id,
+                    })
+                  }
+                >
+                  <p className="text-sm font-medium text-foreground truncate hover:text-primary transition-colors">
                     {customer.name}
                   </p>
-                </div>
+                </button>
+
+                {/* Invoice ID */}
                 <div className="col-span-2 text-xs text-muted-foreground font-mono">
                   #{invoice.id.slice(0, 8)}
                 </div>
+
+                {/* Issued */}
                 <div className="col-span-2 text-xs text-muted-foreground">
                   {formatDate(invoice.dateIssued)}
                 </div>
+
+                {/* Due */}
                 <div className="col-span-2 text-xs text-muted-foreground">
                   {formatDate(invoice.dueDate)}
                 </div>
+
+                {/* Amount */}
                 <div className="col-span-2">
                   <span className="text-sm font-semibold text-foreground">
                     {formatCurrency(invoice.totalAmount)}
                   </span>
                 </div>
+
+                {/* Status */}
                 <div className="col-span-1">
                   <StatusBadge status={invoice.status} />
                 </div>
-              </button>
+
+                {/* Actions */}
+                <div className="col-span-1">
+                  <InvoiceRowActions
+                    invoice={invoice}
+                    customer={customer}
+                    onPreview={() => setPreviewInvoice({ invoice, customer })}
+                    onMarkPaid={() => setMarkPaidInvoice({ invoice, customer })}
+                  />
+                </div>
+              </div>
             ))}
           </div>
         )}
       </div>
 
+      {/* Create Invoice Sheet */}
       <CreateInvoiceSheet
         open={showCreate}
         onClose={() => setShowCreate(false)}
         customers={customers}
       />
+
+      {/* Invoice Preview Modal */}
+      {previewInvoice && (
+        <InvoicePreviewModal
+          open={!!previewInvoice}
+          onClose={() => setPreviewInvoice(null)}
+          invoice={previewInvoice.invoice}
+          customer={previewInvoice.customer}
+          settings={settings}
+        />
+      )}
+
+      {/* Mark as Paid Dialog */}
+      {markPaidInvoice && (
+        <MarkAsPaidDialog
+          open={!!markPaidInvoice}
+          onClose={() => setMarkPaidInvoice(null)}
+          invoice={markPaidInvoice.invoice}
+          customerName={markPaidInvoice.customer.name}
+        />
+      )}
     </div>
   );
 }

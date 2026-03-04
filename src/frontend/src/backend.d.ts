@@ -7,6 +7,28 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
+export type Time = bigint;
+export interface Service {
+    id: string;
+    name: string;
+    description: string;
+    isActive: boolean;
+    notes?: string;
+    price: number;
+    laborRate: number;
+}
+export interface Expense {
+    id: string;
+    expenseType: string;
+    dateIncurred: Time;
+    jobId?: string;
+    description: string;
+    notes?: string;
+    visitId?: string;
+    amount: number;
+    vendorName?: string;
+    receiptBlobId?: string;
+}
 export interface Customer {
     id: string;
     name: string;
@@ -15,6 +37,19 @@ export interface Customer {
     email: string;
     notes?: string;
     phone: string;
+}
+export interface Invoice {
+    id: string;
+    status: string;
+    dateIssued: Time;
+    dueDate: Time;
+    timeEntryIds: Array<string>;
+    jobIds: Array<string>;
+    materialEntryIds: Array<string>;
+    totalAmount: number;
+    notes?: string;
+    timeBlockIds: Array<string>;
+    customerId: string;
 }
 export interface Settings {
     invoiceStartingNumber: bigint;
@@ -40,41 +75,6 @@ export interface Job {
     customerId: string;
     serviceId: string;
 }
-export type Time = bigint;
-export interface Address {
-    id: string;
-    street: string;
-    country: string;
-    city: string;
-    postalCode: string;
-    state: string;
-    isPrimary: boolean;
-    addressLabel: string;
-    notes?: string;
-    customerId: string;
-}
-export interface Service {
-    id: string;
-    name: string;
-    description: string;
-    isActive: boolean;
-    notes?: string;
-    price: number;
-    laborRate: number;
-}
-export interface Invoice {
-    id: string;
-    status: string;
-    dateIssued: Time;
-    dueDate: Time;
-    timeEntryIds: Array<string>;
-    jobIds: Array<string>;
-    materialEntryIds: Array<string>;
-    totalAmount: number;
-    notes?: string;
-    timeBlockIds: Array<string>;
-    customerId: string;
-}
 export interface Visit {
     id: string;
     startTime?: Time;
@@ -98,6 +98,18 @@ export interface UserProfile {
     email: string;
     phone: string;
 }
+export interface Address {
+    id: string;
+    street: string;
+    country: string;
+    city: string;
+    postalCode: string;
+    state: string;
+    isPrimary: boolean;
+    addressLabel: string;
+    notes?: string;
+    customerId: string;
+}
 export enum UserRole {
     admin = "admin",
     user = "user",
@@ -106,11 +118,13 @@ export enum UserRole {
 export interface backendInterface {
     addAddress(address: Address): Promise<void>;
     addCustomer(customer: Customer): Promise<void>;
+    addExpense(expense: Expense): Promise<void>;
     addInvoice(invoice: Invoice): Promise<void>;
     addJob(job: Job): Promise<void>;
     addService(service: Service): Promise<void>;
     addVisit(visit: Visit): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    deleteExpense(id: string): Promise<void>;
     getActiveAddressesByCustomer(customerId: string): Promise<Array<Address>>;
     getAddress(id: string): Promise<Address | null>;
     getCallerUserProfile(): Promise<UserProfile | null>;
@@ -126,9 +140,13 @@ export interface backendInterface {
     isCallerAdmin(): Promise<boolean>;
     listActiveCustomers(): Promise<Array<Customer>>;
     listAddressesByCustomer(customerId: string): Promise<Array<Address>>;
+    listAllExpenses(): Promise<Array<Expense>>;
+    listExpensesByJob(jobId: string): Promise<Array<Expense>>;
+    listExpensesByVisit(visitId: string): Promise<Array<Expense>>;
     listVisitsByJob(jobId: string): Promise<Array<Visit>>;
     loadSeedData(): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    updateExpense(expense: Expense): Promise<void>;
     updateJob(job: Job): Promise<void>;
     updateSettings(newSettings: Settings): Promise<void>;
     updateVisit(visit: Visit): Promise<void>;

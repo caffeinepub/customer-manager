@@ -7,8 +7,10 @@ import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import { CustomerDetailPage } from "./pages/CustomerDetailPage";
 import { CustomersPage } from "./pages/CustomersPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { FinancialsPage } from "./pages/FinancialsPage";
 import { InvoicesPage } from "./pages/InvoicesPage";
 import { JobsPage } from "./pages/JobsPage";
+import { PaymentsPage } from "./pages/PaymentsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ServicesPage } from "./pages/ServicesPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -20,6 +22,8 @@ export type Page =
   | { view: "jobs" }
   | { view: "services" }
   | { view: "invoices" }
+  | { view: "payments" }
+  | { view: "financials" }
   | { view: "settings" }
   | { view: "profile" };
 
@@ -195,6 +199,10 @@ export default function App() {
         return <ServicesPage />;
       case "invoices":
         return <InvoicesPage navigate={navigate} />;
+      case "payments":
+        return <PaymentsPage navigate={navigate} />;
+      case "financials":
+        return <FinancialsPage navigate={navigate} />;
       case "settings":
         return <SettingsPage />;
       case "profile":

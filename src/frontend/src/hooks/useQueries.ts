@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   Address,
   Customer,
+  Expense,
   Invoice,
   Job,
   Service,
@@ -312,6 +313,103 @@ export function useSaveUserProfile() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["user-profile"] });
+    },
+  });
+}
+
+// ─── Expenses ─────────────────────────────────────────────────
+export function useExpensesByJob(jobId: string) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Expense[]>({
+    queryKey: ["expenses-by-job", jobId],
+    queryFn: async () => {
+      if (!actor || !jobId) return [];
+      return actor.listExpensesByJob(jobId);
+    },
+    enabled: !!actor && !isFetching && !!jobId,
+  });
+}
+
+export function useExpensesByVisit(visitId: string) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Expense[]>({
+    queryKey: ["expenses-by-visit", visitId],
+    queryFn: async () => {
+      if (!actor || !visitId) return [];
+      return actor.listExpensesByVisit(visitId);
+    },
+    enabled: !!actor && !isFetching && !!visitId,
+  });
+}
+
+export function useAllExpenses() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Expense[]>({
+    queryKey: ["all-expenses"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listAllExpenses();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useAddExpense() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (expense: Expense) => {
+      if (!actor) throw new Error("No actor");
+      return actor.addExpense(expense);
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["all-expenses"] });
+      if (vars.jobId) {
+        qc.invalidateQueries({ queryKey: ["expenses-by-job", vars.jobId] });
+      }
+      if (vars.visitId) {
+        qc.invalidateQueries({
+          queryKey: ["expenses-by-visit", vars.visitId],
+        });
+      }
+    },
+  });
+}
+
+export function useUpdateExpense() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (expense: Expense) => {
+      if (!actor) throw new Error("No actor");
+      return actor.updateExpense(expense);
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["all-expenses"] });
+      if (vars.jobId) {
+        qc.invalidateQueries({ queryKey: ["expenses-by-job", vars.jobId] });
+      }
+      if (vars.visitId) {
+        qc.invalidateQueries({
+          queryKey: ["expenses-by-visit", vars.visitId],
+        });
+      }
+    },
+  });
+}
+
+export function useDeleteExpense() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      if (!actor) throw new Error("No actor");
+      return actor.deleteExpense(id);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["all-expenses"] });
+      qc.invalidateQueries({ queryKey: ["expenses-by-job"] });
+      qc.invalidateQueries({ queryKey: ["expenses-by-visit"] });
     },
   });
 }

@@ -1,8 +1,10 @@
 import { cn } from "@/lib/utils";
 import {
+  BarChart2,
   Briefcase,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
   FileText,
   LayoutDashboard,
   Leaf,
@@ -45,6 +47,18 @@ const NAV_ITEMS: NavItem[] = [
     icon: FileText,
     view: "invoices",
     ocid: "nav.invoices.link",
+  },
+  {
+    label: "Payments",
+    icon: CreditCard,
+    view: "payments",
+    ocid: "nav.payments.link",
+  },
+  {
+    label: "Financials",
+    icon: BarChart2,
+    view: "financials",
+    ocid: "nav.financials.link",
   },
   {
     label: "Settings",

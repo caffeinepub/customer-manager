@@ -72,6 +72,9 @@ export default {
           ring: "oklch(var(--sidebar-ring))",
         },
       },
+      gridTemplateColumns: {
+        "13": "repeat(13, minmax(0, 1fr))",
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

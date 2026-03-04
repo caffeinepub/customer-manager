@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -19,9 +20,11 @@ import { format } from "date-fns";
 import { Camera, Clock, DollarSign, Loader2, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { ExternalBlob } from "../backend";
 import type { Visit } from "../backend.d.ts";
 import { dateToNs } from "../hooks/useQueries";
 import { useAddVisit, useUpdateVisit } from "../hooks/useQueries";
+import { useStorageClient } from "../hooks/useStorageClient";
 
 interface VisitFormSheetProps {
   open: boolean;
@@ -48,6 +51,7 @@ export function VisitFormSheet({
 }: VisitFormSheetProps) {
   const addVisit = useAddVisit();
   const updateVisit = useUpdateVisit();
+  const storageClient = useStorageClient();
   const isEditing = !!visit;
 
   const [form, setForm] = useState(() => ({
@@ -69,10 +73,10 @@ export function VisitFormSheet({
 
   // Photo upload state
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [_pendingPhotos, setPendingPhotos] = useState<File[]>([]);
+  const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
-  const [uploadProgress] = useState<number>(0);
-  const [isUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -82,6 +86,7 @@ export function VisitFormSheet({
     const urls = files.map((f) => URL.createObjectURL(f));
     setPendingPhotos((prev) => [...prev, ...files]);
     setPhotoPreviewUrls((prev) => [...prev, ...urls]);
+    setUploadProgress((prev) => [...prev, ...files.map(() => 0)]);
     // Reset input
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -90,6 +95,7 @@ export function VisitFormSheet({
     URL.revokeObjectURL(photoPreviewUrls[index]);
     setPendingPhotos((prev) => prev.filter((_, i) => i !== index));
     setPhotoPreviewUrls((prev) => prev.filter((_, i) => i !== index));
+    setUploadProgress((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -104,9 +110,36 @@ export function VisitFormSheet({
       : undefined;
     const endTime = form.endTime ? dateToNs(new Date(form.endTime)) : undefined;
 
-    // TODO: Upload pendingPhotos using StorageClient and collect their hashes
-    // For now, keep existing photoIds if editing; photos will be uploaded via the storage flow
+    // Upload pending photos to blob storage
+    let newPhotoIds: string[] = [];
+    if (pendingPhotos.length > 0) {
+      setIsUploading(true);
+      try {
+        newPhotoIds = await Promise.all(
+          pendingPhotos.map(async (file, idx) => {
+            const bytes = new Uint8Array(await file.arrayBuffer());
+            const blob = ExternalBlob.fromBytes(bytes).withUploadProgress(
+              (pct) => {
+                setUploadProgress((prev) => {
+                  const next = [...prev];
+                  next[idx] = Math.round(pct * 100);
+                  return next;
+                });
+              },
+            );
+            return storageClient.store(blob);
+          }),
+        );
+      } catch {
+        toast.error("Failed to upload photos");
+        setIsUploading(false);
+        return;
+      }
+      setIsUploading(false);
+    }
+
     const existingPhotoIds = visit?.photoIds ?? [];
+    const allPhotoIds = [...existingPhotoIds, ...newPhotoIds];
 
     const updatedVisit: Visit = {
       id: visit?.id ?? crypto.randomUUID(),
@@ -120,7 +153,7 @@ export function VisitFormSheet({
       laborCost,
       notes: form.notes.trim() || undefined,
       internalNotes: form.internalNotes.trim() || undefined,
-      photoIds: existingPhotoIds,
+      photoIds: allPhotoIds,
       createdAt: visit?.createdAt ?? now,
       updatedAt: now,
     };
@@ -311,17 +344,29 @@ export function VisitFormSheet({
             {isEditing && visit && visit.photoIds.length > 0 && (
               <div className="space-y-1.5">
                 <p className="text-xs text-muted-foreground">
-                  {visit.photoIds.length} existing photo
+                  {visit.photoIds.length} saved photo
                   {visit.photoIds.length !== 1 ? "s" : ""}
                 </p>
-                {/* TODO: Render photo thumbnails using StorageClient.getDirectURL */}
                 <div className="flex flex-wrap gap-2">
                   {visit.photoIds.map((id) => (
                     <div
                       key={id}
-                      className="w-16 h-16 rounded-md bg-muted border border-border flex items-center justify-center"
+                      className="w-16 h-16 rounded-md bg-muted border border-border overflow-hidden"
                     >
-                      <Camera className="w-5 h-5 text-muted-foreground/40" />
+                      <img
+                        src={ExternalBlob.fromURL(id).getDirectURL()}
+                        alt="Visit attachment"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const el = e.currentTarget;
+                          el.style.display = "none";
+                          el.parentElement?.classList.add(
+                            "flex",
+                            "items-center",
+                            "justify-center",
+                          );
+                        }}
+                      />
                     </div>
                   ))}
                 </div>
@@ -338,13 +383,23 @@ export function VisitFormSheet({
                       alt={`Preview ${idx + 1}`}
                       className="w-16 h-16 object-cover rounded-md border border-border"
                     />
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(idx)}
-                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
+                    {isUploading && uploadProgress[idx] !== undefined && (
+                      <div className="absolute inset-0 bg-background/70 rounded-md flex items-end p-1">
+                        <Progress
+                          value={uploadProgress[idx]}
+                          className="h-1 w-full"
+                        />
+                      </div>
+                    )}
+                    {!isUploading && (
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(idx)}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -364,21 +419,16 @@ export function VisitFormSheet({
               variant="outline"
               size="sm"
               className="gap-2 text-xs"
+              disabled={isUploading}
               onClick={() => fileInputRef.current?.click()}
             >
               <Upload className="w-3.5 h-3.5" />
               Add Photos
             </Button>
-            {uploadProgress > 0 && uploadProgress < 100 && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all"
-                    style={{ width: `${uploadProgress}%` }}
-                  />
-                </div>
-                <span>{uploadProgress}%</span>
-              </div>
+            {isUploading && (
+              <p className="text-xs text-muted-foreground animate-pulse">
+                Uploading photos…
+              </p>
             )}
           </div>
 
