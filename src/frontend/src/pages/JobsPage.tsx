@@ -17,12 +17,15 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { Briefcase, Loader2, Plus } from "lucide-react";
+import { format } from "date-fns";
+import { Briefcase, CalendarDays, List, Loader2, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { Page } from "../App";
 import type { Address, Customer, Job } from "../backend.d.ts";
+import { JobCalendar } from "../components/JobCalendar";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { useActor } from "../hooks/useActor";
@@ -72,15 +75,25 @@ function useAllJobs(customers: Customer[]) {
   });
 }
 
+// ─── Date formatter for datetime-local input ──────────────────
+function toDatetimeLocal(date: Date): string {
+  // Format as "YYYY-MM-DDTHH:mm" required by datetime-local
+  return format(date, "yyyy-MM-dd'T'HH:mm");
+}
+
 // ─── Add Job Dialog ───────────────────────────────────────────
 function AddJobDialog({
   open,
   onClose,
   customers,
+  defaultStartDate,
+  defaultEndDate,
 }: {
   open: boolean;
   onClose: () => void;
   customers: Customer[];
+  defaultStartDate?: Date;
+  defaultEndDate?: Date;
 }) {
   const addJob = useAddJob();
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
@@ -90,9 +103,25 @@ function AddJobDialog({
     status: "scheduled",
     cost: "",
     notes: "",
-    startDate: "",
-    endDate: "",
+    startDate: defaultStartDate ? toDatetimeLocal(defaultStartDate) : "",
+    endDate: defaultEndDate ? toDatetimeLocal(defaultEndDate) : "",
   });
+
+  // When dialog opens with new default dates, reset and pre-fill the form
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset on open
+  useMemo(() => {
+    if (open) {
+      setForm({
+        addressId: "",
+        status: "scheduled",
+        cost: "",
+        notes: "",
+        startDate: defaultStartDate ? toDatetimeLocal(defaultStartDate) : "",
+        endDate: defaultEndDate ? toDatetimeLocal(defaultEndDate) : "",
+      });
+      setSelectedCustomerId("");
+    }
+  }, [open]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -293,6 +322,9 @@ export function JobsPage({ navigate }: Props) {
   const { data: allJobs = [], isLoading: jobsLoading } = useAllJobs(customers);
   const [showAdd, setShowAdd] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [slotStart, setSlotStart] = useState<Date | undefined>();
+  const [slotEnd, setSlotEnd] = useState<Date | undefined>();
 
   const isLoading = customersLoading || jobsLoading;
 
@@ -312,112 +344,187 @@ export function JobsPage({ navigate }: Props) {
     "cancelled",
   ];
 
+  function handleSelectSlot(start: Date, end: Date) {
+    setSlotStart(start);
+    setSlotEnd(end);
+    setShowAdd(true);
+  }
+
+  function handleDialogClose() {
+    setShowAdd(false);
+    setSlotStart(undefined);
+    setSlotEnd(undefined);
+  }
+
   return (
     <div className="min-h-full">
       <PageHeader
         title="Jobs"
         description={`${allJobs.length} total jobs`}
         action={
-          <Button
-            data-ocid="jobs.add_button"
-            onClick={() => setShowAdd(true)}
-            className="gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Add Job
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* List / Calendar toggle */}
+            <div className="flex items-center rounded-md border border-border overflow-hidden">
+              <button
+                type="button"
+                data-ocid="jobs.list_toggle"
+                onClick={() => setViewMode("list")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors border-r border-border",
+                  viewMode === "list"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background text-foreground hover:bg-accent/30",
+                )}
+              >
+                <List className="w-3.5 h-3.5" />
+                List
+              </button>
+              <button
+                type="button"
+                data-ocid="jobs.calendar_toggle"
+                onClick={() => setViewMode("calendar")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors",
+                  viewMode === "calendar"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background text-foreground hover:bg-accent/30",
+                )}
+              >
+                <CalendarDays className="w-3.5 h-3.5" />
+                Calendar
+              </button>
+            </div>
+
+            <Button
+              data-ocid="jobs.add_button"
+              onClick={() => setShowAdd(true)}
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Add Job
+            </Button>
+          </div>
         }
       />
 
       <div className="p-6 space-y-4">
-        {/* Status filter */}
-        <div className="flex flex-wrap gap-2">
-          {statuses.map((s) => (
-            <button
-              type="button"
-              key={s}
-              data-ocid={s === "all" ? "jobs.filter.tab" : undefined}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                statusFilter === s
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              }`}
-            >
-              {s === "all" ? "All" : s.replace("_", " ")}
-            </button>
-          ))}
-        </div>
-
-        {/* Jobs list */}
-        {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-16 w-full rounded-lg" />
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div
-            data-ocid="jobs.empty_state"
-            className="text-center py-16 text-muted-foreground"
-          >
-            <Briefcase className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p className="font-medium">
-              {statusFilter !== "all"
-                ? `No ${statusFilter.replace("_", " ")} jobs`
-                : "No jobs yet"}
-            </p>
-          </div>
-        ) : (
-          <div className="border border-border rounded-lg overflow-hidden shadow-card">
-            <div className="bg-muted/50 px-4 py-2.5 grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground border-b border-border">
-              <span className="col-span-3">Customer</span>
-              <span className="col-span-3">Address</span>
-              <span className="col-span-2">Dates</span>
-              <span className="col-span-2">Cost</span>
-              <span className="col-span-2">Status</span>
+        {viewMode === "list" && (
+          <>
+            {/* Status filter — only in list view */}
+            <div className="flex flex-wrap gap-2">
+              {statuses.map((s) => (
+                <button
+                  type="button"
+                  key={s}
+                  data-ocid={s === "all" ? "jobs.filter.tab" : undefined}
+                  onClick={() => setStatusFilter(s)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    statusFilter === s
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                  }`}
+                >
+                  {s === "all" ? "All" : s.replace("_", " ")}
+                </button>
+              ))}
             </div>
-            {filtered.map(({ job, customer, address }, idx) => (
-              <button
-                type="button"
-                key={job.id}
-                data-ocid={`jobs.item.${idx + 1}`}
-                onClick={() =>
-                  navigate({ view: "customer-detail", customerId: customer.id })
-                }
-                className="w-full px-4 py-3 grid grid-cols-12 gap-4 items-center hover:bg-accent/30 transition-colors border-b border-border last:border-0 text-left"
+
+            {/* Jobs list */}
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                ))}
+              </div>
+            ) : filtered.length === 0 ? (
+              <div
+                data-ocid="jobs.empty_state"
+                className="text-center py-16 text-muted-foreground"
               >
-                <div className="col-span-3">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {customer.name}
-                  </p>
+                <Briefcase className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p className="font-medium">
+                  {statusFilter !== "all"
+                    ? `No ${statusFilter.replace("_", " ")} jobs`
+                    : "No jobs yet"}
+                </p>
+              </div>
+            ) : (
+              <div className="border border-border rounded-lg overflow-hidden shadow-card">
+                <div className="bg-muted/50 px-4 py-2.5 grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground border-b border-border">
+                  <span className="col-span-3">Customer</span>
+                  <span className="col-span-3">Address</span>
+                  <span className="col-span-2">Dates</span>
+                  <span className="col-span-2">Cost</span>
+                  <span className="col-span-2">Status</span>
                 </div>
-                <div className="col-span-3 text-sm text-muted-foreground truncate">
-                  {address ? `${address.street}, ${address.city}` : "—"}
-                </div>
-                <div className="col-span-2">
-                  <p className="text-xs text-muted-foreground">
-                    {formatDate(job.startTime)}
-                  </p>
-                </div>
-                <div className="col-span-2">
-                  <span className="text-sm font-semibold text-foreground">
-                    {formatCurrency(job.cost)}
-                  </span>
-                </div>
-                <div className="col-span-2">
-                  <StatusBadge status={job.status} />
-                </div>
-              </button>
-            ))}
-          </div>
+                {filtered.map(({ job, customer, address }, idx) => (
+                  <button
+                    type="button"
+                    key={job.id}
+                    data-ocid={`jobs.item.${idx + 1}`}
+                    onClick={() =>
+                      navigate({
+                        view: "customer-detail",
+                        customerId: customer.id,
+                      })
+                    }
+                    className="w-full px-4 py-3 grid grid-cols-12 gap-4 items-center hover:bg-accent/30 transition-colors border-b border-border last:border-0 text-left"
+                  >
+                    <div className="col-span-3">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {customer.name}
+                      </p>
+                    </div>
+                    <div className="col-span-3 text-sm text-muted-foreground truncate">
+                      {address ? `${address.street}, ${address.city}` : "—"}
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(job.startTime)}
+                      </p>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-sm font-semibold text-foreground">
+                        {formatCurrency(job.cost)}
+                      </span>
+                    </div>
+                    <div className="col-span-2">
+                      <StatusBadge status={job.status} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
+
+        {viewMode === "calendar" &&
+          (isLoading ? (
+            <Skeleton
+              data-ocid="jobs.loading_state"
+              className="h-[600px] w-full rounded-lg"
+            />
+          ) : (
+            <JobCalendar
+              jobs={allJobs}
+              onSelectSlot={handleSelectSlot}
+              onSelectEvent={(entry) =>
+                navigate({
+                  view: "customer-detail",
+                  customerId: entry.customer.id,
+                })
+              }
+              navigate={navigate}
+            />
+          ))}
       </div>
 
       <AddJobDialog
         open={showAdd}
-        onClose={() => setShowAdd(false)}
+        onClose={handleDialogClose}
         customers={customers}
+        defaultStartDate={slotStart}
+        defaultEndDate={slotEnd}
       />
     </div>
   );

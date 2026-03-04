@@ -1,53 +1,42 @@
 # Customer Manager
 
 ## Current State
-New project. No existing implementation.
+
+The app has a full-stack Motoko + React setup with:
+- Entities: Customer, Address, Job, Service, Invoice, Payment, Expense, Attachment, UserProfile, Settings
+- Pages: Dashboard, Customers, CustomerDetail, Jobs, Invoices, Services, Settings, Profile
+- Backend APIs: addJob, getJob, getJobsByAddress, listAddressesByCustomer, listActiveCustomers, etc.
+- Jobs page shows a filterable table of all jobs with status, cost, customer, address and dates
+- Jobs have `startTime` and `endTime` (nanosecond timestamps) stored in the backend
 
 ## Requested Changes (Diff)
 
 ### Add
-- **Customer**: id, name, email, phone, tags, isActive, notes, createdAt, updatedAt
-- **Address**: id, customerId, label, street, city, state, postalCode, country, isPrimary, notes, createdAt, updatedAt
-- **Job**: id, customerId, addressId, title, description, status (lead/scheduled/in_progress/completed/invoiced/paid/cancelled), source, priority (low/normal/high), estimatedStartDate, estimatedEndDate, totalLaborHours, totalLaborCost, totalMaterialCost, otherCosts, totalCost, totalPrice, profit, notes, hasWarranty, warrantyExpiresAt, invoiceId, createdAt, updatedAt
-- **Visit**: id, jobId, scheduledDate, startTime, endTime, status (scheduled/in_progress/completed/cancelled), assignedToUserId, laborHours, laborRate, laborCost, notes, internalNotes, travelDistance, travelTimeMinutes, createdAt, updatedAt
-- **Material**: id, visitId, jobId, name, description, sku, quantity, unitCost, totalCost, vendorName, purchaseDate, receiptAttachmentId, createdAt, updatedAt
-- **Expense**: id, jobId, visitId, category (fuel/dump_fee/tool/supplies/other), description, amount, date, vendorName, attachmentId, createdAt, updatedAt
-- **Invoice**: id, jobId, customerId, invoiceNumber, issueDate, dueDate, status (draft/sent/viewed/overdue/paid/void), subtotal, taxRate, taxAmount, total, amountPaid, balanceDue, notes, terms, createdAt, updatedAt
-- **InvoiceLineItem**: id, invoiceId, type (labor/material/fee/discount/other), description, quantity, unitPrice, total, sourceType, sourceId
-- **Payment**: id, invoiceId, customerId, amount, date, method (cash/check/card/transfer/other), referenceNumber, notes, createdAt, updatedAt
-- **Attachment**: id, type (photo/document/receipt/other), fileUrl, thumbnailUrl, fileName, fileSize, mimeType, customerId, jobId, visitId, invoiceId, uploadedAt, notes, createdAt, updatedAt
-- **User**: id, name, email, phone, role (owner/tech/admin), isActive, createdAt, updatedAt
-- **Settings**: single-record, defaultLaborRate, defaultTaxRate, currency, invoicePrefix, invoiceStartingNumber, jobStatusOptions, visitStatusOptions, paymentTermsDays, companyName, companyPhone, companyEmail, companyAddress, createdAt, updatedAt
+- A **Calendar view** accessible from the Jobs tab (as a view toggle alongside the existing list view)
+- Calendar displays jobs as events using their `startTime` and `endTime` fields
+- Calendar supports month, week, and day views
+- Clicking a job event on the calendar opens a detail popover with: customer name, address, status, cost, start/end time, and a link to the customer detail page
+- Ability to **schedule a job** by clicking an empty time slot on the calendar, which opens the existing Add Job dialog pre-filled with the selected date/time
+- A view-toggle button in the Jobs page header to switch between List and Calendar views
 
 ### Modify
-- None
+- Jobs page header: add a toggle (List / Calendar) in addition to the existing "Add Job" button
+- The existing status filter tabs remain visible in list view but are hidden in calendar view
 
 ### Remove
-- None
+- Nothing removed
 
 ## Implementation Plan
 
-### Backend
-- Motoko actor with stable storage for all 12 entities
-- CRUD operations for each entity (create, read, update, delete, list)
-- Query functions: listByCustomer (addresses, jobs, invoices, payments, attachments), listByJob (visits, materials, expenses, attachments), listByVisit (materials, expenses, attachments), listByInvoice (line items, payments)
-- Settings singleton (get/set)
-- Auto-generated IDs and timestamps
-- Computed fields: totalCost, balanceDue, totalLaborCost derived from line items
-
-### Frontend
-- Sidebar navigation with sections: Dashboard, Customers, Jobs, Visits, Invoices, Payments, Expenses, Materials, Attachments, Users, Settings
-- Dashboard: summary cards (open jobs, outstanding invoices, recent activity)
-- Customer list with search, filter by active, tag display
-- Customer detail view with tabs: Info, Addresses, Jobs, Invoices, Attachments
-- Address management embedded in Customer detail
-- Job list with filter by status, priority; Job detail with tabs: Overview, Visits, Materials, Expenses, Invoice
-- Visit list and detail with labor tracking
-- Material list per visit/job
-- Expense list with category filter
-- Invoice list with status filter; Invoice detail with line items and payment history
-- Payment recording form
-- Attachment gallery with upload
-- User management list and form
-- Settings page (single form)
-- Sample data for all entities
+1. Install a calendar library (`react-big-calendar` or build a lightweight custom calendar using date-fns) in the frontend package
+2. Create a `JobCalendar` component that:
+   - Accepts the jobs array (with enriched customer/address data)
+   - Renders month/week/day views
+   - Maps job `startTime`/`endTime` (BigInt nanoseconds) to JS Date objects
+   - Renders each job as a colored event block styled by status
+3. Create a `JobEventPopover` component shown when clicking a calendar event:
+   - Shows customer name, address, status badge, cost, start/end time
+   - "View Customer" link that navigates to customer-detail
+4. Add a view toggle (List | Calendar) to the Jobs page header
+5. Wire the calendar's "click empty slot" handler to open the AddJobDialog with the clicked date/time pre-populated
+6. Style the calendar to match the app's OKLCH design tokens (no default calendar CSS conflicts)
