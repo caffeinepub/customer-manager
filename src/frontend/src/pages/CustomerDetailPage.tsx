@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -21,22 +22,27 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
+  Bell,
   Briefcase,
   FileText,
+  Link2,
   Loader2,
   Mail,
   MapPin,
   Phone,
   Plus,
   Star,
+  Trash2,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Page } from "../App";
 import type { Address, Invoice, Job } from "../backend.d.ts";
 import { StatusBadge } from "../components/StatusBadge";
+import { useLocalStorage } from "../hooks/useLocalStorage";
 import {
   dateToNs,
   formatCurrency,
@@ -49,6 +55,7 @@ import {
   useInvoicesByCustomer,
   useJobsForCustomer,
 } from "../hooks/useQueries";
+import type { FollowUpReminder } from "../types/local";
 
 interface Props {
   customerId: string;
@@ -567,6 +574,92 @@ function AddInvoiceDialog({
   );
 }
 
+// ─── Add Reminder Dialog (inline for customer) ────────────────
+function AddReminderDialog({
+  open,
+  customerId,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  customerId: string;
+  onClose: () => void;
+  onSave: (r: FollowUpReminder) => void;
+}) {
+  const [form, setForm] = useState({ dueDate: "", note: "" });
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    const reminder: FollowUpReminder = {
+      id: crypto.randomUUID(),
+      customerId,
+      dueDate: form.dueDate,
+      note: form.note.trim(),
+      isDone: false,
+      createdAt: new Date().toISOString(),
+    };
+    onSave(reminder);
+    setForm({ dueDate: "", note: "" });
+    setSaving(false);
+    onClose();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent data-ocid="customer_reminder.dialog">
+        <DialogHeader>
+          <DialogTitle className="font-display">Add Reminder</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Due Date *</Label>
+            <Input
+              data-ocid="customer_reminder.input"
+              type="date"
+              required
+              value={form.dueDate}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, dueDate: e.target.value }))
+              }
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Note</Label>
+            <Textarea
+              value={form.note}
+              onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+              rows={2}
+              placeholder="e.g., Follow up on job satisfaction"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              data-ocid="customer_reminder.cancel_button"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={saving}
+              data-ocid="customer_reminder.submit_button"
+            >
+              {saving ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              Add
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────
 export function CustomerDetailPage({ customerId, navigate }: Props) {
   const { data: customer, isLoading } = useCustomer(customerId);
@@ -579,9 +672,20 @@ export function CustomerDetailPage({ customerId, navigate }: Props) {
   const { data: invoices = [], isLoading: invLoading } =
     useInvoicesByCustomer(customerId);
 
+  const [reminders, setReminders] = useLocalStorage<FollowUpReminder[]>(
+    "fp_reminders",
+    [],
+  );
+  const customerReminders = reminders.filter(
+    (r) => r.customerId === customerId,
+  );
+
   const [showAddAddress, setShowAddAddress] = useState(false);
   const [showAddJob, setShowAddJob] = useState(false);
   const [showAddInvoice, setShowAddInvoice] = useState(false);
+  const [showAddReminder, setShowAddReminder] = useState(false);
+
+  const today = new Date().toISOString().split("T")[0];
 
   if (isLoading) {
     return (
@@ -643,13 +747,29 @@ export function CustomerDetailPage({ customerId, navigate }: Props) {
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
             {customer.tags.map((tag) => (
               <Badge key={tag} variant="outline" className="text-xs">
                 <Star className="w-2.5 h-2.5 mr-1" />
                 {tag}
               </Badge>
             ))}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              data-ocid="customer_detail.portal.button"
+              onClick={() => {
+                const url = `${window.location.origin}?portal=${customerId}`;
+                navigator.clipboard
+                  .writeText(url)
+                  .then(() => toast.success("Portal link copied to clipboard!"))
+                  .catch(() => toast.error("Failed to copy link"));
+              }}
+            >
+              <Link2 className="w-3.5 h-3.5" />
+              Share Portal
+            </Button>
           </div>
         </div>
         {customer.notes && (
@@ -680,6 +800,13 @@ export function CustomerDetailPage({ customerId, navigate }: Props) {
             >
               <FileText className="w-3.5 h-3.5 mr-1.5" />
               Invoices ({invoices.length})
+            </TabsTrigger>
+            <TabsTrigger
+              value="reminders"
+              data-ocid="customer_detail.reminders.tab"
+            >
+              <Bell className="w-3.5 h-3.5 mr-1.5" />
+              Reminders ({customerReminders.length})
             </TabsTrigger>
           </TabsList>
 
@@ -851,6 +978,101 @@ export function CustomerDetailPage({ customerId, navigate }: Props) {
               </div>
             )}
           </TabsContent>
+          {/* Reminders Tab */}
+          <TabsContent value="reminders">
+            <div className="flex justify-end mb-3">
+              <Button
+                size="sm"
+                data-ocid="customer_detail.reminder.add_button"
+                onClick={() => setShowAddReminder(true)}
+                className="gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add Reminder
+              </Button>
+            </div>
+            {customerReminders.length === 0 ? (
+              <div
+                data-ocid="customer_detail.reminders.empty_state"
+                className="text-center py-10 text-muted-foreground"
+              >
+                <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p>No reminders for this customer</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {customerReminders.map((r, idx) => {
+                  const isOverdue = !r.isDone && r.dueDate < today;
+                  return (
+                    <div
+                      key={r.id}
+                      data-ocid={`customer_detail.reminder.item.${idx + 1}`}
+                      className={cn(
+                        "flex items-start gap-3 p-3 rounded-lg border transition-colors",
+                        r.isDone
+                          ? "border-border bg-muted/30 opacity-60"
+                          : isOverdue
+                            ? "border-destructive/40 bg-destructive/5"
+                            : "border-border bg-card hover:bg-accent/20",
+                      )}
+                    >
+                      <Checkbox
+                        checked={r.isDone}
+                        onCheckedChange={() =>
+                          setReminders((prev) =>
+                            prev.map((x) =>
+                              x.id === r.id ? { ...x, isDone: !x.isDone } : x,
+                            ),
+                          )
+                        }
+                        className="mt-0.5"
+                        data-ocid={`customer_detail.reminder.checkbox.${idx + 1}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={cn(
+                              "text-xs font-medium px-2 py-0.5 rounded-full",
+                              isOverdue
+                                ? "bg-destructive/10 text-destructive"
+                                : "bg-muted text-muted-foreground",
+                            )}
+                          >
+                            {isOverdue ? "Overdue · " : ""}
+                            {new Date(
+                              `${r.dueDate}T00:00:00`,
+                            ).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </div>
+                        {r.note && (
+                          <p className="text-sm text-foreground mt-0.5">
+                            {r.note}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive shrink-0"
+                        onClick={() =>
+                          setReminders((prev) =>
+                            prev.filter((x) => x.id !== r.id),
+                          )
+                        }
+                        data-ocid={`customer_detail.reminder.delete_button.${idx + 1}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -870,6 +1092,15 @@ export function CustomerDetailPage({ customerId, navigate }: Props) {
         open={showAddInvoice}
         customerId={customerId}
         onClose={() => setShowAddInvoice(false)}
+      />
+      <AddReminderDialog
+        open={showAddReminder}
+        customerId={customerId}
+        onClose={() => setShowAddReminder(false)}
+        onSave={(r) => {
+          setReminders((prev) => [r, ...prev]);
+          toast.success("Reminder added");
+        }}
       />
     </div>
   );

@@ -4,14 +4,19 @@ import { Leaf, Loader2, LogIn, Shield } from "lucide-react";
 import { useState } from "react";
 import { AppSidebar } from "./components/AppSidebar";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
+import { AssetsPage } from "./pages/AssetsPage";
 import { CustomerDetailPage } from "./pages/CustomerDetailPage";
+import { CustomerPortalPage } from "./pages/CustomerPortalPage";
 import { CustomersPage } from "./pages/CustomersPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { EstimatesPage } from "./pages/EstimatesPage";
 import { FinancialsPage } from "./pages/FinancialsPage";
 import { InvoicesPage } from "./pages/InvoicesPage";
 import { JobsPage } from "./pages/JobsPage";
+import { MileageLogPage } from "./pages/MileageLogPage";
 import { PaymentsPage } from "./pages/PaymentsPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { RemindersPage } from "./pages/RemindersPage";
 import { ServicesPage } from "./pages/ServicesPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
@@ -24,6 +29,10 @@ export type Page =
   | { view: "invoices" }
   | { view: "payments" }
   | { view: "financials" }
+  | { view: "estimates" }
+  | { view: "reminders" }
+  | { view: "mileage-log" }
+  | { view: "assets" }
   | { view: "settings" }
   | { view: "profile" };
 
@@ -156,6 +165,19 @@ export default function App() {
   const [page, setPage] = useState<Page>({ view: "dashboard" });
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // Check for customer portal URL param
+  const portalId = new URLSearchParams(window.location.search).get("portal");
+
+  // Render portal if requested (no auth required)
+  if (portalId) {
+    return (
+      <>
+        <CustomerPortalPage customerId={portalId} />
+        <Toaster position="bottom-right" />
+      </>
+    );
+  }
+
   // Show loading while auth is initializing
   if (isInitializing) {
     return (
@@ -203,6 +225,14 @@ export default function App() {
         return <PaymentsPage navigate={navigate} />;
       case "financials":
         return <FinancialsPage navigate={navigate} />;
+      case "estimates":
+        return <EstimatesPage navigate={navigate} />;
+      case "reminders":
+        return <RemindersPage navigate={navigate} />;
+      case "mileage-log":
+        return <MileageLogPage navigate={navigate} />;
+      case "assets":
+        return <AssetsPage navigate={navigate} />;
       case "settings":
         return <SettingsPage />;
       case "profile":

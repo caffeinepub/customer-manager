@@ -1,14 +1,18 @@
 import { cn } from "@/lib/utils";
 import {
   BarChart2,
+  Bell,
   Briefcase,
   ChevronLeft,
   ChevronRight,
   CreditCard,
+  FileSearch,
   FileText,
   LayoutDashboard,
   Leaf,
+  Navigation,
   Settings,
+  Truck,
   User,
   Users,
   Wrench,
@@ -20,6 +24,7 @@ interface NavItem {
   icon: React.ElementType;
   view: Page["view"];
   ocid: string;
+  dividerBefore?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -35,12 +40,25 @@ const NAV_ITEMS: NavItem[] = [
     view: "customers",
     ocid: "nav.customers.link",
   },
+  {
+    label: "Reminders",
+    icon: Bell,
+    view: "reminders",
+    ocid: "nav.reminders.link",
+  },
   { label: "Jobs", icon: Briefcase, view: "jobs", ocid: "nav.jobs.link" },
   {
     label: "Services",
     icon: Wrench,
     view: "services",
     ocid: "nav.services.link",
+  },
+  {
+    label: "Estimates",
+    icon: FileSearch,
+    view: "estimates",
+    ocid: "nav.estimates.link",
+    dividerBefore: true,
   },
   {
     label: "Invoices",
@@ -61,10 +79,24 @@ const NAV_ITEMS: NavItem[] = [
     ocid: "nav.financials.link",
   },
   {
+    label: "Mileage Log",
+    icon: Navigation,
+    view: "mileage-log",
+    ocid: "nav.mileage-log.link",
+    dividerBefore: true,
+  },
+  {
+    label: "Assets",
+    icon: Truck,
+    view: "assets",
+    ocid: "nav.assets.link",
+  },
+  {
     label: "Settings",
     icon: Settings,
     view: "settings",
     ocid: "nav.settings.link",
+    dividerBefore: true,
   },
   {
     label: "My Profile",
@@ -123,6 +155,12 @@ export function AppSidebar({ currentView, navigate, open, onToggle }: Props) {
 
             return (
               <li key={item.view}>
+                {item.dividerBefore && open && (
+                  <div className="h-px bg-sidebar-border mx-1 my-1.5" />
+                )}
+                {item.dividerBefore && !open && (
+                  <div className="h-px bg-sidebar-border mx-1 my-1.5" />
+                )}
                 <button
                   type="button"
                   data-ocid={item.ocid}

@@ -1,8 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  Bell,
   Briefcase,
   CheckCircle2,
   Clock,
@@ -13,11 +16,12 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { Page } from "../App";
 import { StatusBadge } from "../components/StatusBadge";
 import { useActor } from "../hooks/useActor";
+import { useLocalStorage } from "../hooks/useLocalStorage";
 import {
   formatCurrency,
   formatDate,
@@ -25,6 +29,7 @@ import {
   useLoadSeedData,
 } from "../hooks/useQueries";
 import { useInvoicesByCustomer } from "../hooks/useQueries";
+import type { FollowUpReminder } from "../types/local";
 
 interface Props {
   navigate: (p: Page) => void;
@@ -131,6 +136,101 @@ function InvoiceRow({
         <StatusBadge status={latest.status} />
       </div>
     </button>
+  );
+}
+
+function RemindersCard({
+  navigate,
+}: {
+  navigate: (p: Page) => void;
+}) {
+  const [reminders, setReminders] = useLocalStorage<FollowUpReminder[]>(
+    "fp_reminders",
+    [],
+  );
+  const { data: customers = [] } = useCustomers();
+  const today = new Date().toISOString().split("T")[0];
+
+  const pending = useMemo(
+    () =>
+      reminders
+        .filter((r) => !r.isDone)
+        .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+        .slice(0, 5),
+    [reminders],
+  );
+
+  function markDone(id: string) {
+    setReminders((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, isDone: true } : r)),
+    );
+  }
+
+  if (pending.length === 0) return null;
+
+  return (
+    <Card className="shadow-card">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Bell className="w-4 h-4 text-primary" />
+            Follow-up Reminders
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate({ view: "reminders" })}
+            className="text-xs text-primary"
+          >
+            View all
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-2">
+        {pending.map((r) => {
+          const customer = customers.find((c) => c.id === r.customerId);
+          const isOverdue = r.dueDate < today;
+          return (
+            <div
+              key={r.id}
+              className={cn(
+                "flex items-start gap-3 p-2.5 rounded-md border",
+                isOverdue
+                  ? "border-destructive/30 bg-destructive/5"
+                  : "border-border bg-card",
+              )}
+            >
+              <Checkbox
+                checked={false}
+                onCheckedChange={() => markDone(r.id)}
+                className="mt-0.5 shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">
+                  {customer?.name ?? "Unknown"}
+                </p>
+                {r.note && (
+                  <p className="text-xs text-muted-foreground truncate">
+                    {r.note}
+                  </p>
+                )}
+              </div>
+              <span
+                className={cn(
+                  "text-xs font-medium shrink-0",
+                  isOverdue ? "text-destructive" : "text-muted-foreground",
+                )}
+              >
+                {new Date(`${r.dueDate}T00:00:00`).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })}
+              </span>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -371,6 +471,9 @@ export function DashboardPage({ navigate }: Props) {
             </CardContent>
           </Card>
         </div>
+
+        {/* Reminders Card */}
+        <RemindersCard navigate={navigate} />
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Clock,
   DollarSign,
   FileText,
   ImageIcon,
@@ -188,6 +189,9 @@ export function JobDetailSheet({
     }));
 
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalLaborCost = visits.reduce((sum, v) => sum + v.laborCost, 0);
+  const totalLaborHours = visits.reduce((sum, v) => sum + v.laborHours, 0);
+  const totalCost = totalLaborCost + totalExpenses;
 
   function handleOpenLightbox(items: LightboxItem[], startIndex: number) {
     setLightboxItems(items);
@@ -240,6 +244,10 @@ export function JobDetailSheet({
                     </span>
                   </div>
                 )}
+                <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground/70">
+                  <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+                  <span>Start: {formatDate(job.startTime)}</span>
+                </div>
               </div>
               <StatusBadge status={job.status} />
             </div>
@@ -248,11 +256,14 @@ export function JobDetailSheet({
           {/* Job summary cards */}
           <div className="py-4 grid grid-cols-3 gap-3 border-b border-border">
             <div className="rounded-lg bg-muted/50 p-3 flex items-start gap-2.5">
-              <DollarSign className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+              <Clock className="w-4 h-4 text-primary mt-0.5 shrink-0" />
               <div>
-                <p className="text-xs text-muted-foreground">Job Cost</p>
+                <p className="text-xs text-muted-foreground">Total Labor</p>
                 <p className="text-sm font-bold text-foreground">
-                  {formatCurrency(job.cost)}
+                  {formatCurrency(totalLaborCost)}
+                </p>
+                <p className="text-xs text-muted-foreground/60">
+                  {totalLaborHours.toFixed(1)} hrs
                 </p>
               </div>
             </div>
@@ -266,11 +277,11 @@ export function JobDetailSheet({
               </div>
             </div>
             <div className="rounded-lg bg-muted/50 p-3 flex items-start gap-2.5">
-              <CalendarDays className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+              <DollarSign className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
               <div>
-                <p className="text-xs text-muted-foreground">Start Date</p>
-                <p className="text-sm font-bold text-foreground">
-                  {formatDate(job.startTime)}
+                <p className="text-xs text-muted-foreground">Total Cost</p>
+                <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                  {formatCurrency(totalCost)}
                 </p>
               </div>
             </div>
@@ -347,6 +358,31 @@ export function JobDetailSheet({
                 </div>
               </div>
 
+              {visits.length > 0 && (
+                <div className="flex items-center gap-0 rounded-lg bg-muted/40 border border-border/60 text-xs text-muted-foreground overflow-hidden">
+                  <div className="flex items-center gap-1.5 px-3 py-2">
+                    <Briefcase className="w-3.5 h-3.5" />
+                    <span className="font-medium">
+                      {visits.length} visit{visits.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <div className="w-px h-5 bg-border/60" />
+                  <div className="flex items-center gap-1.5 px-3 py-2">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span className="font-medium">
+                      {totalLaborHours.toFixed(1)} hrs
+                    </span>
+                  </div>
+                  <div className="w-px h-5 bg-border/60" />
+                  <div className="flex items-center gap-1.5 px-3 py-2">
+                    <DollarSign className="w-3.5 h-3.5" />
+                    <span className="font-medium">
+                      {formatCurrency(totalLaborCost)} labor
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {visitsLoading ? (
                 <div
                   data-ocid="jobs.detail.loading_state"
@@ -381,7 +417,12 @@ export function JobDetailSheet({
               ) : (
                 <div className="space-y-2.5">
                   {visits.map((v, idx) => (
-                    <VisitCard key={v.id} visit={v} index={idx + 1} />
+                    <VisitCard
+                      key={v.id}
+                      visit={v}
+                      index={idx + 1}
+                      jobId={job.id}
+                    />
                   ))}
                 </div>
               )}

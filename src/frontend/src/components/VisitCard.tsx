@@ -11,17 +11,20 @@ import {
   DollarSign,
   Edit2,
   FileText,
+  Receipt,
   X,
 } from "lucide-react";
 import { useState } from "react";
 import { ExternalBlob } from "../backend";
 import type { Visit } from "../backend.d.ts";
-import { formatCurrency } from "../hooks/useQueries";
+import { formatCurrency, useExpensesByVisit } from "../hooks/useQueries";
+import { ExpenseFormSheet } from "./ExpenseFormSheet";
 import { VisitFormSheet } from "./VisitFormSheet";
 
 interface VisitCardProps {
   visit: Visit;
   index: number;
+  jobId: string;
 }
 
 function nsToDate(ns: bigint): Date {
@@ -156,9 +159,13 @@ function PhotoLightbox({
   );
 }
 
-export function VisitCard({ visit, index }: VisitCardProps) {
+export function VisitCard({ visit, index, jobId }: VisitCardProps) {
   const [editOpen, setEditOpen] = useState(false);
+  const [addExpenseOpen, setAddExpenseOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const { data: visitExpenses = [] } = useExpensesByVisit(visit.id);
+  const visitExpenseTotal = visitExpenses.reduce((sum, e) => sum + e.amount, 0);
 
   const scheduledDate = nsToDate(visit.scheduledDate);
   const formattedDate = format(scheduledDate, "EEE, MMM d, yyyy");
@@ -190,8 +197,18 @@ export function VisitCard({ visit, index }: VisitCardProps) {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <VisitStatusBadge status={visit.status} />
+            <Button
+              data-ocid={`visit.card.add_expense_button.${index}`}
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => setAddExpenseOpen(true)}
+              title="Add Expense"
+            >
+              <Receipt className="w-3.5 h-3.5" />
+            </Button>
             <Button
               data-ocid={`visit.card.edit_button.${index}`}
               variant="ghost"
@@ -238,6 +255,18 @@ export function VisitCard({ visit, index }: VisitCardProps) {
             <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
               {visit.notes}
             </p>
+          </div>
+        )}
+
+        {/* Visit-level expense summary */}
+        {visitExpenses.length > 0 && (
+          <div className="flex items-center gap-1.5 mb-3 px-2 py-1.5 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+            <Receipt className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+              {visitExpenses.length}{" "}
+              {visitExpenses.length === 1 ? "expense" : "expenses"} ·{" "}
+              {formatCurrency(visitExpenseTotal)}
+            </span>
           </div>
         )}
 
@@ -307,6 +336,13 @@ export function VisitCard({ visit, index }: VisitCardProps) {
         onClose={() => setEditOpen(false)}
         jobId={visit.jobId}
         visit={visit}
+      />
+
+      <ExpenseFormSheet
+        open={addExpenseOpen}
+        onClose={() => setAddExpenseOpen(false)}
+        jobId={jobId}
+        visitId={visit.id}
       />
     </>
   );
