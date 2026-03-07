@@ -3,31 +3,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
   Briefcase,
   CheckCircle2,
   Clock,
   FileText,
-  Loader2,
   Plus,
-  Sprout,
   TrendingUp,
   Users,
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { useMemo } from "react";
 import type { Page } from "../App";
 import { StatusBadge } from "../components/StatusBadge";
-import { useActor } from "../hooks/useActor";
 import { useLocalStorage } from "../hooks/useLocalStorage";
-import {
-  formatCurrency,
-  formatDate,
-  useCustomers,
-  useLoadSeedData,
-} from "../hooks/useQueries";
+import { formatCurrency, formatDate, useCustomers } from "../hooks/useQueries";
 import { useInvoicesByCustomer } from "../hooks/useQueries";
 import type { FollowUpReminder } from "../types/local";
 
@@ -236,24 +226,6 @@ function RemindersCard({
 
 export function DashboardPage({ navigate }: Props) {
   const { data: customers = [], isLoading } = useCustomers();
-  const loadSeed = useLoadSeedData();
-  const [seeded, setSeeded] = useState(false);
-  const qc = useQueryClient();
-  const { actor } = useActor();
-
-  const isEmpty = !isLoading && customers.length === 0 && !seeded;
-
-  async function handleLoadSeed() {
-    try {
-      await loadSeed.mutateAsync();
-      await qc.invalidateQueries({ queryKey: ["customers"] });
-      await qc.refetchQueries({ queryKey: ["customers"] });
-      setSeeded(true);
-      toast.success("Sample data loaded successfully!");
-    } catch {
-      toast.error("Failed to load sample data");
-    }
-  }
 
   return (
     <div className="min-h-full">
@@ -268,46 +240,6 @@ export function DashboardPage({ navigate }: Props) {
       </div>
 
       <div className="p-6 space-y-6">
-        {/* Seed data banner */}
-        {isEmpty && (
-          <Card className="border-2 border-primary/20 bg-accent/30 shadow-none">
-            <CardContent className="py-6">
-              <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <Sprout className="w-6 h-6 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-display font-bold text-foreground">
-                    Get started with sample data
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Load realistic customers, jobs, and invoices to explore the
-                    app.
-                  </p>
-                </div>
-                <Button
-                  data-ocid="dashboard.load_seed_button"
-                  onClick={handleLoadSeed}
-                  disabled={loadSeed.isPending || !actor}
-                  className="shrink-0"
-                >
-                  {loadSeed.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 w-4 h-4 animate-spin" />
-                      Loading…
-                    </>
-                  ) : (
-                    <>
-                      <Sprout className="mr-2 w-4 h-4" />
-                      Load Sample Data
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <SummaryCard
@@ -404,7 +336,7 @@ export function DashboardPage({ navigate }: Props) {
                   className="text-center py-8 text-muted-foreground text-sm"
                   data-ocid="customers.empty_state"
                 >
-                  No customers yet. Load sample data or add your first customer.
+                  No customers yet. Add your first customer to get started.
                 </div>
               ) : (
                 <div className="space-y-1">
