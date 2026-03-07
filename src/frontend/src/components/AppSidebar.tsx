@@ -14,10 +14,18 @@ import {
   Settings,
   Truck,
   User,
+  UserCog,
   Users,
   Wrench,
 } from "lucide-react";
 import type { Page } from "../App";
+import { useBusinessLogo } from "../hooks/useBusinessLogo";
+import {
+  type AppView,
+  normalizeRole,
+  usePermissions,
+} from "../hooks/usePermissions";
+import { useSettings, useUserProfile } from "../hooks/useQueries";
 
 interface NavItem {
   label: string;
@@ -99,6 +107,12 @@ const NAV_ITEMS: NavItem[] = [
     dividerBefore: true,
   },
   {
+    label: "Users",
+    icon: UserCog,
+    view: "users",
+    ocid: "nav.users.link",
+  },
+  {
     label: "My Profile",
     icon: User,
     view: "profile",
@@ -114,6 +128,20 @@ interface Props {
 }
 
 export function AppSidebar({ currentView, navigate, open, onToggle }: Props) {
+  const { logoUrl } = useBusinessLogo();
+  const { data: settings } = useSettings();
+  const { data: profile } = useUserProfile();
+  const { canAccess } = usePermissions();
+  const companyName = settings?.companyName || "My Business";
+  const userRole = profile?.role ?? "readonly";
+
+  const visibleNavItems = NAV_ITEMS.filter((item) => {
+    // customer-detail is controlled by the customers permission
+    if (item.view === "customer-detail")
+      return canAccess(userRole, "customers");
+    return canAccess(userRole, item.view as AppView);
+  });
+
   return (
     <aside
       className={cn(
@@ -129,17 +157,27 @@ export function AppSidebar({ currentView, navigate, open, onToggle }: Props) {
           "border-sidebar-border",
         )}
       >
-        <div className="shrink-0 w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
-          <Leaf className="w-4 h-4 text-sidebar-primary-foreground" />
+        <div className="shrink-0 w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center overflow-hidden">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt="Business logo"
+              className="w-8 h-8 rounded-lg object-contain bg-white"
+            />
+          ) : (
+            <Leaf className="w-4 h-4 text-sidebar-primary-foreground" />
+          )}
         </div>
         {open && (
           <div className="overflow-hidden">
             <p className="font-display font-bold text-sm leading-tight text-sidebar-foreground whitespace-nowrap">
-              FieldPro
+              {companyName}
             </p>
-            <p className="text-xs text-sidebar-foreground/50 whitespace-nowrap">
-              Service Manager
-            </p>
+            {!settings?.companyName && (
+              <p className="text-xs text-sidebar-foreground/50 whitespace-nowrap">
+                Service Manager
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -147,7 +185,7 @@ export function AppSidebar({ currentView, navigate, open, onToggle }: Props) {
       {/* Navigation */}
       <nav className="flex-1 py-4 overflow-y-auto">
         <ul className="space-y-1 px-2">
-          {NAV_ITEMS.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive =
               currentView === item.view ||

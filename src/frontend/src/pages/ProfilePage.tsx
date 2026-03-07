@@ -11,17 +11,22 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Save, User } from "lucide-react";
+import { Check, Loader2, Palette, Save, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { UserProfile } from "../backend.d.ts";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useSaveUserProfile, useUserProfile } from "../hooks/useQueries";
+import { THEMES, useUserTheme } from "../hooks/useUserTheme";
 
 export function ProfilePage() {
   const { data: profile, isLoading } = useUserProfile();
   const saveProfile = useSaveUserProfile();
+  const { identity } = useInternetIdentity();
+  const principalId = identity?.getPrincipal()?.toText() ?? "guest";
+  const { theme, setTheme } = useUserTheme(principalId);
 
   const [form, setForm] = useState({
     name: "",
@@ -97,6 +102,7 @@ export function ProfilePage() {
           <div className="space-y-4 max-w-lg">
             <Skeleton className="h-24 w-full rounded-lg" />
             <Skeleton className="h-48 w-full rounded-lg" />
+            <Skeleton className="h-40 w-full rounded-lg" />
           </div>
         ) : (
           <form
@@ -188,9 +194,10 @@ export function ProfilePage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="owner">Owner</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="user">User</SelectItem>
-                      <SelectItem value="guest">Guest</SelectItem>
+                      <SelectItem value="tech">Technician</SelectItem>
+                      <SelectItem value="readonly">Read Only</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -204,6 +211,69 @@ export function ProfilePage() {
                     }
                   />
                   <Label htmlFor="p-active">Active account</Label>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Appearance — Theme Picker */}
+            <Card className="shadow-card">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-semibold">
+                    Appearance
+                  </CardTitle>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Your theme is personal to your account and only affects your
+                  view.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+                  {THEMES.map((t) => {
+                    const isActive = theme === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        data-ocid="profile.theme.toggle"
+                        onClick={() => setTheme(t.id)}
+                        className={`relative flex flex-col items-center gap-1.5 rounded-lg p-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                          isActive
+                            ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                            : "hover:bg-muted"
+                        }`}
+                        title={t.label}
+                        aria-pressed={isActive}
+                      >
+                        {/* Swatch */}
+                        <div
+                          className="w-full h-10 rounded-md overflow-hidden flex"
+                          style={{ minWidth: "56px" }}
+                        >
+                          {/* Left strip = sidebar color */}
+                          <div
+                            className="w-1/3 h-full"
+                            style={{ backgroundColor: t.sidebar }}
+                          />
+                          {/* Right portion = primary color */}
+                          <div
+                            className="flex-1 h-full"
+                            style={{ backgroundColor: t.primary }}
+                          />
+                        </div>
+                        <span className="text-xs font-medium text-foreground leading-none">
+                          {t.label}
+                        </span>
+                        {isActive && (
+                          <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                            <Check className="w-2.5 h-2.5 text-primary-foreground" />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>

@@ -1,9 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
-import { Leaf, Loader2, LogIn, Shield } from "lucide-react";
+import { Leaf, Loader2, LogIn, Shield, ShieldOff } from "lucide-react";
 import { useState } from "react";
 import { AppSidebar } from "./components/AppSidebar";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
+import {
+  type AppView,
+  normalizeRole,
+  usePermissions,
+} from "./hooks/usePermissions";
+import { useUserProfile } from "./hooks/useQueries";
+import { useUserTheme } from "./hooks/useUserTheme";
 import { AssetsPage } from "./pages/AssetsPage";
 import { CustomerDetailPage } from "./pages/CustomerDetailPage";
 import { CustomerPortalPage } from "./pages/CustomerPortalPage";
@@ -19,6 +26,7 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { RemindersPage } from "./pages/RemindersPage";
 import { ServicesPage } from "./pages/ServicesPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { UsersPage } from "./pages/UsersPage";
 
 export type Page =
   | { view: "dashboard" }
@@ -34,7 +42,26 @@ export type Page =
   | { view: "mileage-log" }
   | { view: "assets" }
   | { view: "settings" }
-  | { view: "profile" };
+  | { view: "profile" }
+  | { view: "users" };
+
+// ─── Access Denied Page ───────────────────────────────────────
+function AccessDeniedPage() {
+  return (
+    <div className="flex h-full items-center justify-center p-12">
+      <div className="text-center space-y-3">
+        <ShieldOff className="w-12 h-12 text-muted-foreground mx-auto" />
+        <h2 className="font-display text-xl font-bold text-foreground">
+          Access Restricted
+        </h2>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          You don't have permission to view this page. Contact your admin to
+          request access.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 // ─── Loading Screen ───────────────────────────────────────────
 function LoadingScreen() {
@@ -198,11 +225,57 @@ export default function App() {
     );
   }
 
+  return (
+    <AuthenticatedApp
+      identity={identity}
+      page={page}
+      setPage={setPage}
+      sidebarOpen={sidebarOpen}
+      setSidebarOpen={setSidebarOpen}
+    />
+  );
+}
+
+// ─── Authenticated App (hooks that require auth) ───────────────
+interface AuthenticatedAppProps {
+  identity: NonNullable<ReturnType<typeof useInternetIdentity>["identity"]>;
+  page: Page;
+  setPage: React.Dispatch<React.SetStateAction<Page>>;
+  sidebarOpen: boolean;
+  setSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+function AuthenticatedApp({
+  identity,
+  page,
+  setPage,
+  sidebarOpen,
+  setSidebarOpen,
+}: AuthenticatedAppProps) {
+  const { data: profile } = useUserProfile();
+  const { canAccess } = usePermissions();
+
+  // Apply per-user theme on mount (reads from localStorage via useState initializer)
+  useUserTheme(identity.getPrincipal()?.toText());
+
   function navigate(p: Page) {
     setPage(p);
   }
 
+  function getPermissionView(p: Page): AppView {
+    // customer-detail maps to the "customers" permission
+    if (p.view === "customer-detail") return "customers";
+    return p.view as AppView;
+  }
+
   function renderPage() {
+    const permView = getPermissionView(page);
+    const role = profile?.role ?? "readonly";
+
+    if (!canAccess(role, permView)) {
+      return <AccessDeniedPage />;
+    }
+
     switch (page.view) {
       case "dashboard":
         return <DashboardPage navigate={navigate} />;
@@ -237,6 +310,8 @@ export default function App() {
         return <SettingsPage />;
       case "profile":
         return <ProfilePage />;
+      case "users":
+        return <UsersPage />;
       default:
         return <DashboardPage navigate={navigate} />;
     }

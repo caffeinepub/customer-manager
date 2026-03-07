@@ -1,3 +1,4 @@
+import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   Address,
@@ -8,6 +9,7 @@ import type {
   Service,
   Settings,
   UserProfile,
+  UserRole,
   Visit,
 } from "../backend.d.ts";
 import { useActor } from "./useActor";
@@ -315,6 +317,36 @@ export function useSaveUserProfile() {
       qc.invalidateQueries({ queryKey: ["user-profile"] });
     },
   });
+}
+
+export function useAssignUserRole() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      user,
+      role,
+    }: {
+      user: Principal;
+      role: UserRole;
+    }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.assignCallerUserRole(user, role);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["user-profile"] });
+    },
+  });
+}
+
+export function useGetUserProfile() {
+  const { actor } = useActor();
+  return async (principalText: string): Promise<UserProfile | null> => {
+    if (!actor) return null;
+    const { Principal } = await import("@icp-sdk/core/principal");
+    const p = Principal.fromText(principalText);
+    return actor.getUserProfile(p);
+  };
 }
 
 // ─── Expenses ─────────────────────────────────────────────────

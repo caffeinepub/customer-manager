@@ -14,6 +14,7 @@ interface Props {
   invoice: Invoice;
   customer?: Customer | null;
   settings?: Settings | null;
+  logoUrl?: string | null;
 }
 
 function StatusStamp({ status }: { status: string }) {
@@ -94,6 +95,7 @@ export function InvoicePreviewModal({
   invoice,
   customer,
   settings,
+  logoUrl,
 }: Props) {
   // Inject print styles
   useEffect(() => {
@@ -211,19 +213,33 @@ export function InvoicePreviewModal({
                       marginBottom: "8px",
                     }}
                   >
-                    <div
-                      style={{
-                        width: "36px",
-                        height: "36px",
-                        background: "#1e293b",
-                        borderRadius: "8px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Building2 size={18} color="#ffffff" />
-                    </div>
+                    {logoUrl ? (
+                      <img
+                        src={logoUrl}
+                        alt="Logo"
+                        style={{
+                          width: "48px",
+                          height: "48px",
+                          objectFit: "contain",
+                          borderRadius: "8px",
+                          background: "#f8fafc",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "36px",
+                          height: "36px",
+                          background: "#1e293b",
+                          borderRadius: "8px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Building2 size={18} color="#ffffff" />
+                      </div>
+                    )}
                     <h1
                       style={{
                         fontSize: "20px",

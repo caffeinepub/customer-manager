@@ -3,16 +3,53 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2, Save } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Loader2, Lock, Save, ShieldCheck, Upload, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Settings } from "../backend.d.ts";
 import { PageHeader } from "../components/PageHeader";
-import { useSettings, useUpdateSettings } from "../hooks/useQueries";
+import { useBusinessLogo } from "../hooks/useBusinessLogo";
+import {
+  PERMISSION_VIEWS,
+  type PermissionRole,
+  usePermissions,
+} from "../hooks/usePermissions";
+import {
+  useSettings,
+  useUpdateSettings,
+  useUserProfile,
+} from "../hooks/useQueries";
 
 export function SettingsPage() {
   const { data: settings, isLoading } = useSettings();
   const updateSettings = useUpdateSettings();
+  const { logoUrl, setLogoUrl } = useBusinessLogo();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { data: profile } = useUserProfile();
+  const { matrix, setPermission } = usePermissions();
+
+  function handleLogoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result;
+      if (typeof result === "string") {
+        setLogoUrl(result);
+        toast.success("Logo uploaded");
+      }
+    };
+    reader.readAsDataURL(file);
+    // Reset so the same file can be re-selected
+    e.target.value = "";
+  }
 
   const [form, setForm] = useState({
     companyName: "",
@@ -68,6 +105,9 @@ export function SettingsPage() {
     }
   }
 
+  const canManagePermissions =
+    profile?.role === "owner" || profile?.role === "admin";
+
   if (isLoading) {
     return (
       <div className="min-h-full">
@@ -110,6 +150,78 @@ export function SettingsPage() {
           onSubmit={handleSave}
           className="space-y-6 max-w-2xl"
         >
+          {/* Business Logo */}
+          <Card className="shadow-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">
+                Business Logo
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-5">
+                {/* Preview */}
+                {logoUrl ? (
+                  <div className="relative shrink-0">
+                    <img
+                      src={logoUrl}
+                      alt="Business logo preview"
+                      className="max-h-20 max-w-[160px] object-contain rounded-lg border border-border bg-muted/30 p-1"
+                    />
+                  </div>
+                ) : (
+                  <div className="shrink-0 w-20 h-20 rounded-lg border-2 border-dashed border-border flex items-center justify-center text-muted-foreground/40">
+                    <Upload className="w-6 h-6" />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-muted-foreground">
+                    {logoUrl
+                      ? "Your logo will appear on invoices and in the sidebar."
+                      : "Upload a PNG, JPG, or SVG logo. It will appear on invoices and in the sidebar."}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    {/* Hidden file input */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleLogoFileChange}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      data-ocid="settings.logo.upload_button"
+                      className="gap-2"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      {logoUrl ? "Replace Logo" : "Upload Logo"}
+                    </Button>
+                    {logoUrl && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        data-ocid="settings.logo.delete_button"
+                        className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                          setLogoUrl(null);
+                          toast.success("Logo removed");
+                        }}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Remove Logo
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Company Info */}
           <Card className="shadow-card">
             <CardHeader className="pb-3">
@@ -299,6 +411,124 @@ export function SettingsPage() {
             </Button>
           </div>
         </form>
+
+        {/* Users & Permissions — outside the form to avoid submit interference */}
+        {canManagePermissions && (
+          <div className="max-w-2xl mt-6">
+            <Card className="shadow-card">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-semibold">
+                    Users &amp; Permissions
+                  </CardTitle>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Control which sections each role can access. Owner access
+                  cannot be revoked.
+                </p>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <TooltipProvider>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left font-semibold text-foreground pb-3 pr-4 w-36">
+                          Page
+                        </th>
+                        <th className="text-center font-semibold text-foreground pb-3 px-3 w-20">
+                          <span className="flex flex-col items-center gap-0.5">
+                            <Lock className="w-3.5 h-3.5 text-primary" />
+                            Owner
+                          </span>
+                        </th>
+                        <th className="text-center font-semibold text-foreground pb-3 px-3 w-20">
+                          Admin
+                        </th>
+                        <th className="text-center font-semibold text-foreground pb-3 px-3 w-20">
+                          Tech
+                        </th>
+                        <th className="text-center font-semibold text-foreground pb-3 px-3 w-24">
+                          Read&nbsp;Only
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {PERMISSION_VIEWS.map(({ view, label }) => (
+                        <tr
+                          key={view}
+                          className="border-b border-border/50 last:border-0"
+                        >
+                          <td className="py-3 pr-4 font-medium text-foreground">
+                            {label}
+                          </td>
+                          {/* Owner — always locked */}
+                          <td className="py-3 px-3 text-center">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-primary/10">
+                                  <Lock className="w-3.5 h-3.5 text-primary" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Owner always has full access
+                              </TooltipContent>
+                            </Tooltip>
+                          </td>
+                          {/* Admin */}
+                          <td className="py-3 px-3 text-center">
+                            <Switch
+                              data-ocid="settings.permissions.switch"
+                              checked={matrix[view]?.admin ?? false}
+                              onCheckedChange={(checked) =>
+                                setPermission(
+                                  view,
+                                  "admin" as PermissionRole,
+                                  checked,
+                                )
+                              }
+                              aria-label={`Admin access to ${label}`}
+                            />
+                          </td>
+                          {/* Tech */}
+                          <td className="py-3 px-3 text-center">
+                            <Switch
+                              data-ocid="settings.permissions.switch"
+                              checked={matrix[view]?.tech ?? false}
+                              onCheckedChange={(checked) =>
+                                setPermission(
+                                  view,
+                                  "tech" as PermissionRole,
+                                  checked,
+                                )
+                              }
+                              aria-label={`Tech access to ${label}`}
+                            />
+                          </td>
+                          {/* Read Only */}
+                          <td className="py-3 px-3 text-center">
+                            <Switch
+                              data-ocid="settings.permissions.switch"
+                              checked={matrix[view]?.readonly ?? false}
+                              onCheckedChange={(checked) =>
+                                setPermission(
+                                  view,
+                                  "readonly" as PermissionRole,
+                                  checked,
+                                )
+                              }
+                              aria-label={`Read-only access to ${label}`}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </TooltipProvider>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

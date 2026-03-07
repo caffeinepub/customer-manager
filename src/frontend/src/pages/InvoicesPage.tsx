@@ -26,6 +26,7 @@ import { MarkAsPaidDialog } from "../components/MarkAsPaidDialog";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { useActor } from "../hooks/useActor";
+import { useBusinessLogo } from "../hooks/useBusinessLogo";
 import {
   formatCurrency,
   formatDate,
@@ -133,6 +134,7 @@ export function InvoicesPage({ navigate }: Props) {
   const { data: allInvoices = [], isLoading: invLoading } =
     useAllInvoices(customers);
   const { data: settings } = useSettings();
+  const { logoUrl } = useBusinessLogo();
 
   const [showCreate, setShowCreate] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -332,6 +334,7 @@ export function InvoicesPage({ navigate }: Props) {
           invoice={previewInvoice.invoice}
           customer={previewInvoice.customer}
           settings={settings}
+          logoUrl={logoUrl}
         />
       )}
 
