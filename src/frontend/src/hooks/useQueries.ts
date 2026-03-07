@@ -11,8 +11,36 @@ import type {
   UserProfile,
   UserRole,
   Visit,
+  backendInterface,
 } from "../backend.d.ts";
 import { useActor } from "./useActor";
+
+// Returns a stable actor reference. If the actor captured in the closure
+// is null (still loading), waits briefly for the query cache to populate.
+function useStableActor() {
+  const { actor, isFetching } = useActor();
+  const qc = useQueryClient();
+
+  async function getActor(): Promise<backendInterface> {
+    if (actor) return actor;
+    // Actor might still be initializing — poll the cache for up to 8 seconds
+    for (let attempt = 0; attempt < 32; attempt++) {
+      await new Promise((r) => setTimeout(r, 250));
+      // Find any actor query entry in cache (key starts with "actor")
+      const queries = qc.getQueriesData<backendInterface>({
+        queryKey: ["actor"],
+      });
+      for (const [, data] of queries) {
+        if (data) return data;
+      }
+    }
+    throw new Error(
+      "Not signed in. Please sign in with Internet Identity and try again.",
+    );
+  }
+
+  return { actor, isFetching, getActor };
+}
 
 // ─── Helpers ──────────────────────────────────────────────────
 export function dateToNs(date: Date): bigint {
@@ -65,12 +93,12 @@ export function useCustomer(id: string) {
 }
 
 export function useAddCustomer() {
-  const { actor } = useActor();
+  const { getActor } = useStableActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (customer: Customer) => {
-      if (!actor) throw new Error("No actor");
-      return actor.addCustomer(customer);
+      const a = await getActor();
+      return a.addCustomer(customer);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customers"] });
@@ -92,12 +120,12 @@ export function useAddressesByCustomer(customerId: string) {
 }
 
 export function useAddAddress() {
-  const { actor } = useActor();
+  const { getActor } = useStableActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (address: Address) => {
-      if (!actor) throw new Error("No actor");
-      return actor.addAddress(address);
+      const a = await getActor();
+      return a.addAddress(address);
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["addresses", vars.customerId] });
@@ -134,12 +162,12 @@ export function useJobsForCustomer(customerId: string, addresses: Address[]) {
 }
 
 export function useAddJob() {
-  const { actor } = useActor();
+  const { getActor } = useStableActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (job: Job) => {
-      if (!actor) throw new Error("No actor");
-      return actor.addJob(job);
+      const a = await getActor();
+      return a.addJob(job);
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["jobs-by-address", vars.addressId] });
@@ -152,12 +180,12 @@ export function useAddJob() {
 }
 
 export function useUpdateJob() {
-  const { actor } = useActor();
+  const { getActor } = useStableActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (job: Job) => {
-      if (!actor) throw new Error("No actor");
-      return actor.updateJob(job);
+      const a = await getActor();
+      return a.updateJob(job);
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["all-jobs"] });
@@ -183,12 +211,12 @@ export function useListVisitsByJob(jobId: string) {
 }
 
 export function useAddVisit() {
-  const { actor } = useActor();
+  const { getActor } = useStableActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (visit: Visit) => {
-      if (!actor) throw new Error("No actor");
-      return actor.addVisit(visit);
+      const a = await getActor();
+      return a.addVisit(visit);
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["visits", vars.jobId] });
@@ -197,12 +225,12 @@ export function useAddVisit() {
 }
 
 export function useUpdateVisit() {
-  const { actor } = useActor();
+  const { getActor } = useStableActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (visit: Visit) => {
-      if (!actor) throw new Error("No actor");
-      return actor.updateVisit(visit);
+      const a = await getActor();
+      return a.updateVisit(visit);
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["visits", vars.jobId] });
@@ -224,12 +252,12 @@ export function useJobServices(jobId: string) {
 }
 
 export function useAddService() {
-  const { actor } = useActor();
+  const { getActor } = useStableActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (service: Service) => {
-      if (!actor) throw new Error("No actor");
-      return actor.addService(service);
+      const a = await getActor();
+      return a.addService(service);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["services"] });
@@ -251,12 +279,12 @@ export function useInvoicesByCustomer(customerId: string) {
 }
 
 export function useAddInvoice() {
-  const { actor } = useActor();
+  const { getActor } = useStableActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (invoice: Invoice) => {
-      if (!actor) throw new Error("No actor");
-      return actor.addInvoice(invoice);
+      const a = await getActor();
+      return a.addInvoice(invoice);
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["invoices", vars.customerId] });
@@ -279,12 +307,12 @@ export function useSettings() {
 }
 
 export function useUpdateSettings() {
-  const { actor } = useActor();
+  const { getActor } = useStableActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (settings: Settings) => {
-      if (!actor) throw new Error("No actor");
-      return actor.updateSettings(settings);
+      const a = await getActor();
+      return a.updateSettings(settings);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings"] });
@@ -306,12 +334,12 @@ export function useUserProfile() {
 }
 
 export function useSaveUserProfile() {
-  const { actor } = useActor();
+  const { getActor } = useStableActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
-      if (!actor) throw new Error("No actor");
-      return actor.saveCallerUserProfile(profile);
+      const a = await getActor();
+      return a.saveCallerUserProfile(profile);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["user-profile"] });
@@ -320,7 +348,7 @@ export function useSaveUserProfile() {
 }
 
 export function useAssignUserRole() {
-  const { actor } = useActor();
+  const { getActor } = useStableActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -330,8 +358,8 @@ export function useAssignUserRole() {
       user: Principal;
       role: UserRole;
     }) => {
-      if (!actor) throw new Error("No actor");
-      return actor.assignCallerUserRole(user, role);
+      const a = await getActor();
+      return a.assignCallerUserRole(user, role);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["user-profile"] });
@@ -387,12 +415,12 @@ export function useAllExpenses() {
 }
 
 export function useAddExpense() {
-  const { actor } = useActor();
+  const { getActor } = useStableActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (expense: Expense) => {
-      if (!actor) throw new Error("No actor");
-      return actor.addExpense(expense);
+      const a = await getActor();
+      return a.addExpense(expense);
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["all-expenses"] });
@@ -409,12 +437,12 @@ export function useAddExpense() {
 }
 
 export function useUpdateExpense() {
-  const { actor } = useActor();
+  const { getActor } = useStableActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (expense: Expense) => {
-      if (!actor) throw new Error("No actor");
-      return actor.updateExpense(expense);
+      const a = await getActor();
+      return a.updateExpense(expense);
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["all-expenses"] });
@@ -431,12 +459,12 @@ export function useUpdateExpense() {
 }
 
 export function useDeleteExpense() {
-  const { actor } = useActor();
+  const { getActor } = useStableActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      if (!actor) throw new Error("No actor");
-      return actor.deleteExpense(id);
+      const a = await getActor();
+      return a.deleteExpense(id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["all-expenses"] });
@@ -448,12 +476,12 @@ export function useDeleteExpense() {
 
 // ─── Seed Data ────────────────────────────────────────────────
 export function useLoadSeedData() {
-  const { actor } = useActor();
+  const { getActor } = useStableActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      if (!actor) throw new Error("No actor");
-      return actor.loadSeedData();
+      const a = await getActor();
+      return a.loadSeedData();
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customers"] });

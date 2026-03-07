@@ -32,7 +32,7 @@ export function ProfilePage() {
     name: "",
     email: "",
     phone: "",
-    role: "user",
+    role: "readonly",
     isActive: true,
   });
 
@@ -60,8 +60,10 @@ export function ProfilePage() {
     try {
       await saveProfile.mutateAsync(updated);
       toast.success("Profile saved");
-    } catch {
-      toast.error("Failed to save profile");
+    } catch (err) {
+      toast.error("Failed to save profile", {
+        description: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
